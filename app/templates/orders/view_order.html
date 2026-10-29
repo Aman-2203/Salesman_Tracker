@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}Order {{ order.order_number }}{% endblock %}
+{% block page_title %}Order Details{% endblock %}
+{% block page_subtitle %}{{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 680px; margin: 0 auto;">
+  <div class="card mb-2">
+    <div class="d-flex justify-between align-center mb-3">
+      <div>
+        <div style="font-size:1.1rem; font-weight:700; color:var(--accent-dark);">{{ order.order_number }}</div>
+        <div class="text-muted fs-sm"><i class="bi bi-calendar3"></i> {{ order.order_date.strftime('%d/%m/%Y') }}</div>
+      </div>
+      {% if order.status == 'no_order' %}<span class="badge badge-default" style="font-size:0.875rem; padding:0.4rem 1rem;"><i class="bi bi-slash-circle"></i> No Order</span>
+      {% elif order.status == 'confirmed' %}<span class="badge badge-success" style="font-size:0.875rem; padding:0.4rem 1rem;"><i class="bi bi-check-circle-fill"></i> Confirmed</span>
+      {% elif order.status == 'delivered' %}<span class="badge badge-info" style="font-size:0.875rem; padding:0.4rem 1rem;"><i class="bi bi-box-seam-fill"></i> Delivered</span>
+      {% elif order.status == 'cancelled' %}<span class="badge badge-danger" style="font-size:0.875rem; padding:0.4rem 1rem;"><i class="bi bi-x-circle-fill"></i> Cancelled</span>
+      {% else %}<span class="badge badge-warning" style="font-size:0.875rem; padding:0.4rem 1rem;"><i class="bi bi-hourglass-split"></i> Pending</span>{% endif %}
+    </div>
+
+    <!-- Order Placed Banner -->
+    <div style="padding:0.875rem 1rem; border-radius:var(--radius-sm); margin-bottom:1.25rem;
+                background:{{ 'var(--red-50)' if order.status == 'no_order' else '#f0fdf4' }};
+                border:1px solid {{ 'var(--red-200)' if order.status == 'no_order' else '#bbf7d0' }};">
+      <span style="font-weight:700; font-size:0.95rem; color:{{ 'var(--accent)' if order.status == 'no_order' else 'var(--success)' }};">
+        Order Placed: {{ 'No' if order.status == 'no_order' else 'Yes' }}
+      </span>
+      {% if order.total_amount and order.total_amount > 0 %}
+      <span style="margin-left:1rem; font-size:1rem; font-weight:800; color:var(--success);">
+        ₹{{ '{:,.2f}'.format(order.total_amount) }}
+      </span>
+      {% endif %}
+    </div>
+
+    <div class="grid grid-2 mb-3">
+      <div>
+        <div class="fs-xs text-muted mb-1">CUSTOMER</div>
+        <div class="fw-600">{{ order.customer.name }}</div>
+        <div class="fs-sm text-muted">{{ order.customer.phone or '—' }}</div>
+      </div>
+      <div>
+        <div class="fs-xs text-muted mb-1">SALES REP</div>
+        <div class="fw-600">{{ order.rep.name }}</div>
+        <div class="fs-sm text-muted">{{ order.rep.phone or '—' }}</div>
+      </div>
+    </div>
+
+    {% if order.items %}
+    <div class="divider"></div>
+    <div class="card-title mb-2">Order Items</div>
+    <div class="table-wrapper" style="margin-bottom:1rem;">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>
+        </thead>
+        <tbody>
+          {% for item in order.items %}
+          <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td style="font-weight:600;">{{ item.name }}</td>
+            <td>{{ item.qty }}</td>
+            <td>₹{{ '{:,.2f}'.format(item.price) }}</td>
+            <td style="font-weight:700; color:var(--success);">₹{{ '{:,.2f}'.format(item.subtotal) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align:right; font-weight:700; padding:0.875rem 1rem; color:var(--text-primary);">TOTAL</td>
+            <td style="font-weight:800; font-size:1.1rem; color:var(--success); padding:0.875rem 1rem;">
+              ₹{{ '{:,.2f}'.format(order.total_amount) }}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if order.notes %}
+    <div class="form-group">
+      <div class="fs-xs text-muted mb-1">NOTES</div>
+      <div style="font-size:0.875rem; color:var(--text-secondary);">{{ order.notes }}</div>
+    </div>
+    {% endif %}
+
+    {% if current_user.role == 'admin' %}
+    <div class="divider"></div>
+    <form method="POST" action="{{ url_for('orders.update_status', order_id=order.id) }}" class="d-flex gap-2 align-center">
+      <select name="status" style="max-width:200px;">
+        <option value="no_order" {% if order.status == 'no_order' %}selected{% endif %}>🚫 No Order</option>
+        <option value="pending" {% if order.status == 'pending' %}selected{% endif %}>⏳ Pending</option>
+        <option value="confirmed" {% if order.status == 'confirmed' %}selected{% endif %}>✅ Confirmed</option>
+        <option value="delivered" {% if order.status == 'delivered' %}selected{% endif %}>📦 Delivered</option>
+        <option value="cancelled" {% if order.status == 'cancelled' %}selected{% endif %}>❌ Cancelled</option>
+      </select>
+      <button type="submit" class="btn btn-primary btn-sm">Update Status</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <a href="{{ url_for('orders.list_orders') }}" class="btn btn-ghost">← Back to Orders</a>
+</div>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}Payments{% endblock %}
+{% block page_title %}{{ 'All Collections' if current_user.role == 'admin' else 'My Collections' }}{% endblock %}
+{% block page_subtitle %}Payment collections (dates in dd/mm/yyyy){% endblock %}
+
+{% block topbar_actions %}
+{% if current_user.role == 'admin' %}
+<a href="{{ url_for('payments.new_payment') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Collect Cheque</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2>Payment Collections</h2>
+    <p>{{ payments|length }} records — ₹{{ '{:,.2f}'.format(total) }} total collected</p>
+  </div>
+</div>
+
+<div class="stat-card mb-3" style="max-width: 320px;">
+  <div class="stat-icon green"><i class="bi bi-cash-stack"></i></div>
+  <div class="stat-body">
+    <div class="stat-value" style="font-size:1.6rem;">₹{{ '{:,.0f}'.format(total) }}</div>
+    <div class="stat-label">Total Cheques Collected</div>
+  </div>
+</div>
+
+<!-- Search & Filter Bar -->
+<div class="card mb-3" style="padding: 1rem;">
+  <form method="GET" action="{{ url_for('payments.list_payments') }}" class="d-flex gap-2 flex-wrap align-center">
+    <div style="flex: 2; min-width: 180px; position: relative;">
+      <input type="text" name="q" value="{{ selected_q }}"
+             placeholder="Search cheque #, customer, or bank..."
+             style="padding-left: 2.2rem; width: 100%;">
+      <i class="bi bi-search" style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+    </div>
+    {% if current_user.role == 'admin' and reps %}
+    <div style="flex: 1; min-width: 140px;">
+      <select name="rep_id" style="width: 100%;">
+        <option value="">— All Reps —</option>
+        {% for r in reps %}
+        <option value="{{ r.id }}" {% if selected_rep == r.id %}selected{% endif %}>{{ r.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div style="flex: 1; min-width: 140px;">
+      <input type="date" name="date" value="{{ selected_date }}" style="width: 100%;" title="Filter by date">
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Filter</button>
+    {% if selected_q or selected_date or selected_rep %}
+    <a href="{{ url_for('payments.list_payments') }}" class="btn btn-ghost btn-sm">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <div class="table-wrapper" style="border:none; border-radius:0;">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          {% if current_user.role == 'admin' %}<th>Rep</th>{% endif %}
+          <th>Customer</th><th>Cheque / Ref #</th><th>Bank</th><th>Cheque Date</th><th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in payments %}
+        <tr>
+          <td class="text-muted">{{ p.collection_date.strftime('%d/%m/%Y') }}</td>
+          {% if current_user.role == 'admin' %}
+          <td style="font-weight:600;color:var(--text-primary);">{{ p.rep.name }}</td>
+          {% endif %}
+          <td style="font-weight:600;">{{ p.customer.name }}</td>
+          <td style="font-family:monospace; font-weight:600; color:var(--accent-dark);">{{ p.cheque_number }}</td>
+          <td class="text-muted">{{ p.bank_name or '—' }}</td>
+          <td class="text-muted">{{ p.cheque_date.strftime('%d/%m/%Y') }}</td>
+          <td style="font-weight:700; color:var(--success);">₹{{ '{:,.2f}'.format(p.cheque_amount) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ 7 if current_user.role == 'admin' else 6 }}">
+          <div class="empty-state" style="padding:2rem;">
+            <div class="empty-icon"><i class="bi bi-credit-card-2-front"></i></div>
+            <h3>No collections found</h3>
+            {% if current_user.role == 'admin' %}
+            <a href="{{ url_for('payments.new_payment') }}" class="btn btn-primary mt-2"><i class="bi bi-plus-lg"></i> Record First Collection</a>
+            {% else %}
+            <p class="text-muted fs-sm mt-1">Collections are recorded during customer visits.</p>
+            <a href="{{ url_for('visits.record_visit') }}" class="btn btn-primary mt-2"><i class="bi bi-geo-alt-fill"></i> Record Customer Visit</a>
+            {% endif %}
+          </div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

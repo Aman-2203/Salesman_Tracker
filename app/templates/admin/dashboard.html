@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block page_title %}Admin Dashboard{% endblock %}
+{% block page_subtitle %}Live overview — {{ today.strftime('%A, %d/%m/%Y') }}{% endblock %}
+
+{% block content %}
+<!-- KPI Row -->
+<div class="grid grid-4 mb-3">
+  <div class="stat-card">
+    <div class="stat-icon red"><i class="bi bi-people"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ total_reps }}</div>
+      <div class="stat-label">Active Reps</div>
+      <div class="stat-change up">{{ today_attendance }} online today</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon red"><i class="bi bi-geo-alt-fill"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ today_visits }}</div>
+      <div class="stat-label">Visits Today</div>
+      <div class="stat-change up">Recorded with GPS</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon amber"><i class="bi bi-cart3"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ today_orders }}</div>
+      <div class="stat-label">Orders Today</div>
+      <div class="stat-change up">₹{{ '{:,.0f}'.format(today_order_value) }}</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green"><i class="bi bi-cash-stack"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ today_collections }}</div>
+      <div class="stat-label">Collections Today</div>
+      <div class="stat-change up">₹{{ '{:,.0f}'.format(today_collection_value) }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-main-grid mb-3">
+  <!-- Team Activity Table -->
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="card-header" style="padding:1.25rem 1.5rem;">
+      <span class="card-title">Team Activity Today</span>
+      <span class="live-dot"></span>
+    </div>
+    <div class="table-wrapper" style="border:none; border-radius:0;">
+      <table>
+        <thead>
+          <tr>
+            <th>Rep</th>
+            <th>Status</th>
+            <th>Visits Today</th>
+            <th>Orders</th>
+            <th>Last Seen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in rep_activity %}
+          <tr>
+            <td>
+              <div class="d-flex align-center gap-1">
+                <div class="user-avatar" style="width:30px;height:30px;font-size:0.75rem;flex-shrink:0;">
+                  {{ item.rep.name[0].upper() }}
+                </div>
+                <div>
+                  <div style="font-weight:600;font-size:0.85rem;color:var(--text-primary);">{{ item.rep.name }}</div>
+                  <div style="font-size:0.72rem;color:var(--text-muted);">{{ item.rep.phone or '—' }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              {% if item.attendance and item.attendance.day_start %}
+                {% if item.attendance.day_end %}
+                  <span class="badge badge-default"><i class="bi bi-flag-fill"></i> Done</span>
+                {% else %}
+                  <span class="badge badge-success"><i class="bi bi-circle-fill text-success"></i> Active</span>
+                {% endif %}
+              {% else %}
+                <span class="badge badge-danger"><i class="bi bi-dash-circle"></i> Offline</span>
+              {% endif %}
+            </td>
+            <td>
+              <span style="font-weight:700;color:var(--text-primary);">{{ item.visits_today }}</span>
+            </td>
+            <td><span style="font-weight:600;color:var(--success);">{{ item.orders_today }}</span></td>
+            <td class="fs-xs text-muted">
+              {% if item.last_visit %}
+                <span style="font-weight:600;color:var(--text-secondary);">{{ item.last_visit.check_in_time.strftime('%H:%M') }}</span>
+                · {{ item.last_visit.customer.name }}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted" style="padding:2rem;">No reps found</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Live Map -->
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="card-header" style="padding:1.25rem 1.5rem;">
+      <span class="card-title">Live Rep Site Visits</span>
+      <span class="d-flex align-center gap-1">
+        <span class="live-dot"></span>
+        <span class="fs-xs text-muted">From customer visit check-ins</span>
+      </span>
+    </div>
+    <div id="live-map" style="border-radius:0; border:none; height:360px;"></div>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <!-- Recent Visits with GPS Location -->
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="card-header" style="padding:1.25rem 1.5rem;">
+      <span class="card-title">Recent Customer Visits</span>
+      <a href="{{ url_for('admin.reports_visits') }}" class="btn btn-ghost btn-sm">View All →</a>
+    </div>
+    <div class="table-wrapper" style="border:none; border-radius:0;">
+      <table>
+        <thead>
+          <tr>
+            <th>Rep</th>
+            <th>Customer</th>
+            <th>Location (GPS)</th>
+            <th>Outcome</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in recent_visits %}
+          <tr>
+            <td style="font-weight:600;color:var(--text-primary);">{{ v.rep.name }}</td>
+            <td>
+              <div style="font-weight:600;">{{ v.customer.name }}</div>
+              <div class="fs-xs text-muted">{{ v.customer.area or '' }}</div>
+            </td>
+            <td>
+              {% if v.check_in_lat and v.check_in_lng %}
+              <a href="https://www.google.com/maps?q={{ v.check_in_lat }},{{ v.check_in_lng }}" target="_blank" rel="noopener noreferrer" class="badge badge-info" title="Open GPS location in Google Maps">
+                <i class="bi bi-geo-alt-fill"></i> {{ '%.4f'|format(v.check_in_lat) }}, {{ '%.4f'|format(v.check_in_lng) }} <i class="bi bi-box-arrow-up-right"></i>
+              </a>
+              {% else %}
+              <span class="badge badge-default">No GPS</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if v.outcome == 'met' %}
+                <span class="badge badge-success"><i class="bi bi-hand-thumbs-up-fill"></i> Met</span>
+              {% elif v.outcome == 'not_met' %}
+                <span class="badge badge-danger"><i class="bi bi-hand-thumbs-down-fill"></i> Not Met</span>
+              {% elif v.outcome == 'follow_up' %}
+                <span class="badge badge-warning"><i class="bi bi-arrow-repeat"></i> Follow-up</span>
+              {% else %}
+                <span class="badge badge-default"><i class="bi bi-check-circle-fill"></i> Visited</span>
+              {% endif %}
+            </td>
+            <td class="text-muted fs-xs">
+              {{ v.check_in_time.strftime('%H:%M') if v.check_in_time else v.visit_date.strftime('%d/%m/%Y') }}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted" style="padding:2rem;">No visits logged yet</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Quick Stats & Collection Summary -->
+  <div>
+    <div class="card mb-2">
+      <div class="card-title mb-2">Weekly Order Value</div>
+      <div class="stat-value" style="font-size:2rem;color:var(--success);">₹{{ '{:,.0f}'.format(weekly_orders_value) }}</div>
+      <div class="text-muted fs-sm mt-1">Confirmed orders booked this week</div>
+    </div>
+
+    <div class="card mb-2">
+      <div class="card-title mb-2">Today's Collections</div>
+      <div class="stat-value" style="font-size:2rem;color:var(--text-primary);">₹{{ '{:,.0f}'.format(today_collection_value) }}</div>
+      <div class="d-flex gap-2 mt-2 flex-wrap">
+        <span class="badge badge-success"><i class="bi bi-credit-card"></i> {{ today_collections }} Collection(s)</span>
+        <span class="badge badge-info"><i class="bi bi-cart3"></i> {{ today_orders }} Order(s)</span>
+        <span class="badge badge-default"><i class="bi bi-geo-alt"></i> {{ today_visits }} Visit(s)</span>
+      </div>
+    </div>
+
+    <div class="d-flex gap-1 flex-wrap">
+      <a href="{{ url_for('admin.team') }}" class="btn btn-ghost btn-sm" style="flex:1; min-width:120px;"><i class="bi bi-people"></i> Manage Team</a>
+      <a href="{{ url_for('customers.new_customer') }}" class="btn btn-ghost btn-sm" style="flex:1; min-width:120px;"><i class="bi bi-plus-lg"></i> Add Customer</a>
+      <a href="{{ url_for('admin.add_rep') }}" class="btn btn-primary btn-sm" style="flex:1; min-width:120px;"><i class="bi bi-plus-lg"></i> Add Rep</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Initialize Leaflet map
+const map = L.map('live-map', { zoomControl: true }).setView([20.5937, 78.9629], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap'
+}).addTo(map);
+
+const repIcon = L.divIcon({
+  html: '<div style="background:linear-gradient(135deg,#dc2626,#991b1b);width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 10px rgba(220,38,38,0.5);color:white;">📍</div>',
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+  className: ''
+});
+
+function loadLiveLocations() {
+  fetch('/api/locations/live')
+    .then(r => r.json())
+    .then(data => {
+      data.forEach(rep => {
+        if (!rep.lat || !rep.lng) return;
+        const marker = L.marker([rep.lat, rep.lng], { icon: repIcon }).addTo(map);
+        marker.bindPopup(`
+          <div style="font-family:Inter,sans-serif;padding:6px;min-width:160px;">
+            <strong style="color:#0f172a;font-size:13px;">${rep.name}</strong><br>
+            <span style="font-size:12px;color:#dc2626;font-weight:600;">🏪 ${rep.last_seen_customer || 'Visit Location'}</span><br>
+            <span style="font-size:11px;color:#64748b;">⏱️ ${new Date(rep.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span><br>
+            <div style="margin-top:4px;">
+              <a href="https://www.google.com/maps?q=${rep.lat},${rep.lng}" target="_blank" style="color:#0284c7;font-size:11px;text-decoration:none;font-weight:600;">
+                📍 Open in Google Maps ↗
+              </a>
+            </div>
+          </div>
+        `);
+      });
+      if (data.length > 0) {
+        const bounds = data.filter(r => r.lat && r.lng).map(r => [r.lat, r.lng]);
+        if (bounds.length > 0) {
+          map.fitBounds(bounds, { padding: [40, 40] });
+        }
+      }
+    })
+    .catch(() => {});
+}
+
+loadLiveLocations();
+setInterval(loadLiveLocations, 5 * 60 * 1000);
+</script>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block title %}Customers{% endblock %}
+{% block page_title %}Customers{% endblock %}
+{% block page_subtitle %}Customer and retailer directory (open to all salesmen){% endblock %}
+
+{% block topbar_actions %}
+{% if current_user.role == 'admin' %}
+<a href="{{ url_for('customers.new_customer') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Customer</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2>Customers</h2>
+    <p>{{ customers|length }} customer(s) found · Available for any salesman to visit</p>
+  </div>
+</div>
+
+<!-- Search & Filter Bar -->
+<div class="card mb-3" style="padding: 1rem;">
+  <form method="GET" action="{{ url_for('customers.list_customers') }}" class="d-flex gap-2 flex-wrap align-center">
+    <div style="flex: 2; min-width: 200px; position: relative;">
+      <input type="text" name="q" id="customer-search-input" value="{{ selected_q }}"
+             placeholder="Search by store name, area, or phone..."
+             style="padding-left: 2.2rem; width: 100%;">
+      <i class="bi bi-search" style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+    </div>
+    {% if areas %}
+    <div style="flex: 1; min-width: 150px;">
+      <select name="area" style="width: 100%;">
+        <option value="">— All Areas —</option>
+        {% for a in areas %}
+        <option value="{{ a }}" {% if selected_area == a %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Filter</button>
+    {% if selected_q or selected_area %}
+    <a href="{{ url_for('customers.list_customers') }}" class="btn btn-ghost btn-sm">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="grid grid-auto" id="customers-grid">
+  {% for c in customers %}
+  <div class="card customer-card-item" style="padding:1.25rem;"
+       data-name="{{ c.name|lower }}"
+       data-area="{{ (c.area or '')|lower }}"
+       data-phone="{{ (c.phone or '')|lower }}">
+    <div class="d-flex align-center gap-2 mb-2">
+      <div class="stat-icon blue" style="width:42px; height:42px; font-size:1.1rem; flex-shrink:0;">
+        <i class="bi bi-shop"></i>
+      </div>
+      <div style="min-width:0; flex:1;">
+        <div style="font-weight:700; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ c.name }}</div>
+        <div class="fs-xs text-muted"><i class="bi bi-geo-alt"></i> {{ c.area or 'No area specified' }}</div>
+      </div>
+      {% if current_user.role == 'admin' %}
+      <span class="badge {% if c.is_active %}badge-success{% else %}badge-danger{% endif %}">
+        {% if c.is_active %}<i class="bi bi-check-circle-fill"></i> Active{% else %}<i class="bi bi-slash-circle-fill"></i> Inactive{% endif %}
+      </span>
+      {% endif %}
+    </div>
+
+    {% if c.phone %}
+    <div class="fs-sm text-secondary mb-2">
+      <i class="bi bi-telephone"></i> <a href="tel:{{ c.phone }}" style="color:inherit; text-decoration:none;">{{ c.phone }}</a>
+    </div>
+    {% endif %}
+
+    {% if current_user.role == 'admin' %}
+    <div class="d-flex gap-1 mt-2">
+      <a href="{{ url_for('customers.edit_customer', cid=c.id) }}" class="btn btn-ghost btn-sm" style="flex:1; text-align:center;">
+        <i class="bi bi-pencil-square"></i> Edit
+      </a>
+      <form method="POST" action="{{ url_for('customers.toggle_customer', cid=c.id) }}" style="flex:1;">
+        <button type="submit" class="btn btn-sm w-100 {% if c.is_active %}btn-warning{% else %}btn-success{% endif %}"
+                onclick="return confirm('{{ 'Deactivate' if c.is_active else 'Activate' }} {{ c.name }}?')">
+          {% if c.is_active %}<i class="bi bi-slash-circle"></i> Deactivate{% else %}<i class="bi bi-check-circle"></i> Activate{% endif %}
+        </button>
+      </form>
+    </div>
+    {% else %}
+    <div class="mt-2">
+      <a href="{{ url_for('visits.record_visit', customer_id=c.id) }}" class="btn btn-primary btn-sm w-100">
+        <i class="bi bi-geo-alt-fill"></i> Record Visit Here
+      </a>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="empty-state" style="grid-column:1/-1;">
+    <div class="empty-icon"><i class="bi bi-shop"></i></div>
+    <h3>No customers found</h3>
+    {% if current_user.role == 'admin' %}
+    <a href="{{ url_for('customers.new_customer') }}" class="btn btn-primary mt-2"><i class="bi bi-plus-lg"></i> Add First Customer</a>
+    {% else %}
+    <p>No customers match the current filter.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+// Live client-side filter
+document.getElementById('customer-search-input')?.addEventListener('input', function(e) {
+  const query = e.target.value.toLowerCase().trim();
+  const cards = document.querySelectorAll('.customer-card-item');
+  cards.forEach(card => {
+    const name = card.dataset.name || '';
+    const area = card.dataset.area || '';
+    const phone = card.dataset.phone || '';
+    if (!query || name.includes(query) || area.includes(query) || phone.includes(query)) {
+      card.style.display = '';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+});
+</script>
+{% endblock %}

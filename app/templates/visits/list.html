@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block title %}Visits{% endblock %}
+{% block page_title %}{{ 'All Visits' if current_user.role == 'admin' else 'My Visits' }}{% endblock %}
+{% block page_subtitle %}Visit log with captured GPS location and timestamp (GMT+5:30){% endblock %}
+
+{% block topbar_actions %}
+{% if current_user.role == 'rep' %}
+<a href="{{ url_for('visits.record_visit') }}" class="btn btn-primary btn-sm"><i class="bi bi-geo-alt-fill"></i> Record Visit</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2>{{ 'All Visits' if current_user.role == 'admin' else 'My Visits' }}</h2>
+    <p>{{ visits|length }} records logged</p>
+  </div>
+  {% if current_user.role == 'rep' %}
+  <a href="{{ url_for('visits.record_visit') }}" class="btn btn-primary"><i class="bi bi-geo-alt-fill"></i> Record New Visit</a>
+  {% endif %}
+</div>
+
+<!-- Search & Filter Bar -->
+<div class="card mb-3" style="padding: 1rem;">
+  <form method="GET" action="{{ url_for('visits.list_visits') }}" class="d-flex gap-2 flex-wrap align-center">
+    <div style="flex: 2; min-width: 180px; position: relative;">
+      <input type="text" name="q" value="{{ selected_q }}"
+             placeholder="Search customer, rep, or notes..."
+             style="padding-left: 2.2rem; width: 100%;">
+      <i class="bi bi-search" style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+    </div>
+    <div style="flex: 1; min-width: 130px;">
+      <select name="outcome" style="width: 100%;">
+        <option value="">— All Outcomes —</option>
+        <option value="met" {% if selected_outcome == 'met' %}selected{% endif %}>👍 Met</option>
+        <option value="not_met" {% if selected_outcome == 'not_met' %}selected{% endif %}>👎 Not Met</option>
+        <option value="follow_up" {% if selected_outcome == 'follow_up' %}selected{% endif %}>🔄 Follow-up</option>
+      </select>
+    </div>
+    {% if current_user.role == 'admin' and reps %}
+    <div style="flex: 1; min-width: 140px;">
+      <select name="rep_id" style="width: 100%;">
+        <option value="">— All Reps —</option>
+        {% for r in reps %}
+        <option value="{{ r.id }}" {% if selected_rep == r.id %}selected{% endif %}>{{ r.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div style="flex: 1; min-width: 140px;">
+      <input type="date" name="date" value="{{ selected_date }}" style="width: 100%;" title="Filter by date">
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Filter</button>
+    {% if selected_q or selected_outcome or selected_date or selected_rep %}
+    <a href="{{ url_for('visits.list_visits') }}" class="btn btn-ghost btn-sm">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <div class="table-wrapper" style="border:none; border-radius:0;">
+    <table>
+      <thead>
+        <tr>
+          {% if current_user.role == 'admin' %}<th>Rep</th>{% endif %}
+          <th>Date & Time (IST)</th>
+          <th>Customer</th>
+          <th>Location (GPS)</th>
+          <th>Outcome</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in visits %}
+        <tr>
+          {% if current_user.role == 'admin' %}
+          <td style="font-weight:600; color:var(--text-primary);">{{ v.rep.name }}</td>
+          {% endif %}
+          <td>
+            <div style="font-weight:600; color:var(--text-primary);">
+              <i class="bi bi-clock"></i> {{ v.check_in_time.strftime('%H:%M') if v.check_in_time else '—' }}
+            </div>
+            <div class="fs-xs text-muted">{{ v.visit_date.strftime('%d/%m/%Y') }}</div>
+          </td>
+          <td>
+            <div style="font-weight:700;">{{ v.customer.name }}</div>
+            <div class="fs-xs text-muted"><i class="bi bi-geo-alt"></i> {{ v.customer.area or 'No area' }}</div>
+          </td>
+          <td>
+            {% if v.check_in_lat and v.check_in_lng %}
+            <a href="https://www.google.com/maps?q={{ v.check_in_lat }},{{ v.check_in_lng }}" target="_blank" rel="noopener noreferrer" class="badge badge-info" title="Open GPS location in Google Maps">
+              <i class="bi bi-geo-alt-fill"></i> {{ '%.4f'|format(v.check_in_lat) }}, {{ '%.4f'|format(v.check_in_lng) }} <i class="bi bi-box-arrow-up-right"></i>
+            </a>
+            {% else %}
+            <span class="badge badge-default">No GPS</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if v.outcome == 'met' %}
+              <span class="badge badge-success"><i class="bi bi-hand-thumbs-up-fill"></i> Met</span>
+            {% elif v.outcome == 'not_met' %}
+              <span class="badge badge-danger"><i class="bi bi-hand-thumbs-down-fill"></i> Not Met</span>
+            {% elif v.outcome == 'follow_up' %}
+              <span class="badge badge-warning"><i class="bi bi-arrow-repeat"></i> Follow-up</span>
+            {% else %}
+              <span class="badge badge-default"><i class="bi bi-check-circle-fill"></i> Visited</span>
+            {% endif %}
+          </td>
+          <td style="max-width:240px; font-size:0.82rem; color:var(--text-secondary);">
+            {{ v.notes or '—' }}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="{{ 6 if current_user.role == 'admin' else 5 }}">
+            <div class="empty-state" style="padding:2.5rem;">
+              <div class="empty-icon"><i class="bi bi-calendar2-x"></i></div>
+              <h3>No visits found</h3>
+              {% if current_user.role == 'rep' %}
+              <p>When you are at a customer site, tap below to log your visit.</p>
+              <a href="{{ url_for('visits.record_visit') }}" class="btn btn-primary mt-2"><i class="bi bi-geo-alt-fill"></i> Record Visit</a>
+              {% else %}
+              <p>No field visit records match your filters.</p>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,281 @@
+{% extends 'base.html' %}
+{% block title %}Record Visit{% endblock %}
+{% block page_title %}Record Customer Visit{% endblock %}
+{% block page_subtitle %}Log location, visit outcome, order & payment collection{% endblock %}
+
+{% block content %}
+<div style="max-width: 620px; margin: 0 auto;">
+  <div class="card">
+    <form method="POST" action="{{ url_for('visits.record_visit') }}" id="visit-form">
+      <input type="hidden" name="lat" id="gps-lat">
+      <input type="hidden" name="lng" id="gps-lng">
+
+      <!-- GPS Location & Time Status Banner -->
+      <div class="card mb-3" style="background:var(--red-50); border:1px solid var(--border-red); padding:0.875rem 1rem;">
+        <div class="d-flex align-center justify-between flex-wrap gap-1">
+          <div class="d-flex align-center gap-1">
+            <span id="gps-icon" style="font-size:1.2rem; color:var(--accent);"><i class="bi bi-broadcast"></i></span>
+            <div>
+              <div id="gps-status" style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">
+                Capturing GPS location…
+              </div>
+              <div id="gps-coords" class="fs-xs text-muted">
+                Acquiring site coordinates
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="gps-retry-btn" onclick="captureGPS(true)" style="background:white;">
+            <i class="bi bi-arrow-clockwise"></i> Refresh GPS
+          </button>
+        </div>
+      </div>
+
+      <!-- 1. Customer Selection -->
+      <div class="form-group">
+        <label for="customer_id">Select Customer / Store <span class="required">*</span></label>
+        <select id="customer_id" name="customer_id" required>
+          <option value="">— Choose a customer (all available) —</option>
+          {% for c in customers %}
+          <option value="{{ c.id }}" {% if selected_customer_id == c.id %}selected{% endif %}>
+            {{ c.name }} — {{ c.area or 'No area' }}{% if c.phone %} (📞 {{ c.phone }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        {% if not customers %}
+        <div class="form-hint text-danger">No active customers found. Please add a customer first.</div>
+        {% endif %}
+      </div>
+
+      <!-- 2. Visit Outcome -->
+      <div class="form-group">
+        <label>Visit Outcome <span class="required">*</span></label>
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem;">
+          <label class="outcome-card selected" id="card-met">
+            <input type="radio" name="outcome" value="met" checked style="display:none;">
+            <span style="font-size:1.5rem; color:var(--success);"><i class="bi bi-hand-thumbs-up-fill"></i></span>
+            <span style="font-size:0.82rem; font-weight:700; margin-top:0.25rem;">Met</span>
+          </label>
+          <label class="outcome-card" id="card-not_met">
+            <input type="radio" name="outcome" value="not_met" style="display:none;">
+            <span style="font-size:1.5rem; color:var(--danger);"><i class="bi bi-hand-thumbs-down-fill"></i></span>
+            <span style="font-size:0.82rem; font-weight:700; margin-top:0.25rem;">Not Met</span>
+          </label>
+          <label class="outcome-card" id="card-follow_up">
+            <input type="radio" name="outcome" value="follow_up" style="display:none;">
+            <span style="font-size:1.5rem; color:var(--warning);"><i class="bi bi-arrow-repeat"></i></span>
+            <span style="font-size:0.82rem; font-weight:700; margin-top:0.25rem;">Follow Up</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 3. Unified Order Section -->
+      <div class="form-group">
+        <div class="d-flex justify-between align-center mb-1">
+          <label style="margin:0;"><i class="bi bi-cart3"></i> Order Placed?</label>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem;">
+          <label class="toggle-card selected" id="toggle-order-no">
+            <input type="radio" name="order_placed" value="no" checked style="display:none;" onchange="toggleOrderSection(false)">
+            <span><i class="bi bi-x-circle"></i> No Order</span>
+          </label>
+          <label class="toggle-card" id="toggle-order-yes">
+            <input type="radio" name="order_placed" value="yes" style="display:none;" onchange="toggleOrderSection(true)">
+            <span><i class="bi bi-check-circle-fill text-success"></i> Yes, Book Order</span>
+          </label>
+        </div>
+
+        <!-- Collapsible Order Details -->
+        <div id="order-details-box" style="display:none; margin-top:0.85rem; padding:1rem; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm);">
+          <div class="form-group" style="margin-bottom:0.5rem;">
+            <label for="order_amount">Order Amount (₹) <span class="required">*</span></label>
+            <input type="number" id="order_amount" name="order_amount" placeholder="0.00" min="0" step="0.01">
+          </div>
+          <div class="fs-xs text-muted">A confirmed order record will be created automatically for this customer.</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 4. Unified Payment / Collection Section -->
+      <div class="form-group">
+        <div class="d-flex justify-between align-center mb-1">
+          <label style="margin:0;"><i class="bi bi-credit-card"></i> Payment Collected?</label>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem;">
+          <label class="toggle-card selected" id="toggle-payment-no">
+            <input type="radio" name="payment_collected" value="no" checked style="display:none;" onchange="togglePaymentSection(false)">
+            <span><i class="bi bi-x-circle"></i> No Payment</span>
+          </label>
+          <label class="toggle-card" id="toggle-payment-yes">
+            <input type="radio" name="payment_collected" value="yes" style="display:none;" onchange="togglePaymentSection(true)">
+            <span><i class="bi bi-cash-stack text-success"></i> Yes, Collect Payment</span>
+          </label>
+        </div>
+
+        <!-- Collapsible Payment Details -->
+        <div id="payment-details-box" style="display:none; margin-top:0.85rem; padding:1rem; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm);">
+          <div class="form-row cols-2 mb-1">
+            <div class="form-group" style="margin-bottom:0.5rem;">
+              <label for="payment_amount">Collection Amount (₹) <span class="required">*</span></label>
+              <input type="number" id="payment_amount" name="payment_amount" placeholder="0.00" min="0" step="0.01">
+            </div>
+            <div class="form-group" style="margin-bottom:0.5rem;">
+              <label for="cheque_number">Cheque / Ref #</label>
+              <input type="text" id="cheque_number" name="cheque_number" placeholder="e.g. 001245 or CASH">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0.3rem;">
+            <label for="bank_name">Bank Name</label>
+            <input type="text" id="bank_name" name="bank_name" placeholder="e.g. HDFC Bank, SBI">
+          </div>
+          <div class="fs-xs text-muted">A payment collection entry will be recorded automatically for this customer.</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 5. Notes -->
+      <div class="form-group">
+        <label for="notes">Visit Notes <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+        <textarea id="notes" name="notes" placeholder="Items discussed, follow-up timeline, retailer feedback..."></textarea>
+      </div>
+
+      <!-- Submit Buttons -->
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary btn-lg" style="flex:1;">
+          <i class="bi bi-check-lg"></i> Complete & Save Visit
+        </button>
+        <a href="{{ url_for('rep.dashboard') }}" class="btn btn-ghost btn-lg">
+          <i class="bi bi-arrow-left"></i> Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.outcome-card,
+.toggle-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0.5rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  background: var(--bg-card);
+  user-select: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.toggle-card {
+  flex-direction: row;
+  padding: 0.65rem 0.75rem;
+  gap: 0.35rem;
+}
+
+.outcome-card:hover,
+.toggle-card:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+}
+
+.outcome-card.selected,
+.toggle-card.selected {
+  border-color: var(--accent);
+  background: var(--red-100);
+  color: var(--red-800);
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
+}
+</style>
+
+{% block extra_scripts %}
+<script>
+// Auto-capture GPS on load
+function captureGPS(isManual) {
+  const latField = document.getElementById('gps-lat');
+  const lngField = document.getElementById('gps-lng');
+  const iconEl = document.getElementById('gps-icon');
+  const statusEl = document.getElementById('gps-status');
+  const coordsEl = document.getElementById('gps-coords');
+
+  iconEl.textContent = '📡';
+  statusEl.textContent = isManual ? 'Refreshing GPS location…' : 'Capturing current location…';
+  coordsEl.textContent = 'Contacting device GPS';
+
+  if (!navigator.geolocation) {
+    iconEl.textContent = '⚠️';
+    statusEl.textContent = 'Geolocation not supported by device';
+    coordsEl.textContent = 'Visit will be saved without GPS coordinates';
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      latField.value = lat.toFixed(6);
+      lngField.value = lng.toFixed(6);
+      iconEl.textContent = '📍';
+      statusEl.textContent = 'Location Captured Successfully';
+      coordsEl.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)} (accuracy ±${Math.round(pos.coords.accuracy || 0)}m)`;
+    },
+    err => {
+      iconEl.textContent = '⚠️';
+      statusEl.textContent = 'Could not capture GPS coordinates';
+      coordsEl.textContent = 'You can still submit; visit will be logged without GPS';
+    },
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+// Outcome Card Selection
+document.querySelectorAll('input[name="outcome"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    document.querySelectorAll('.outcome-card').forEach(c => c.classList.remove('selected'));
+    radio.closest('.outcome-card').classList.add('selected');
+  });
+});
+
+// Toggle Order Section
+function toggleOrderSection(show) {
+  document.getElementById('toggle-order-no').classList.toggle('selected', !show);
+  document.getElementById('toggle-order-yes').classList.toggle('selected', show);
+  const box = document.getElementById('order-details-box');
+  box.style.display = show ? 'block' : 'none';
+  const amountInput = document.getElementById('order_amount');
+  if (show) {
+    amountInput.focus();
+  } else {
+    amountInput.value = '';
+  }
+}
+
+// Toggle Payment Section
+function togglePaymentSection(show) {
+  document.getElementById('toggle-payment-no').classList.toggle('selected', !show);
+  document.getElementById('toggle-payment-yes').classList.toggle('selected', show);
+  const box = document.getElementById('payment-details-box');
+  box.style.display = show ? 'block' : 'none';
+  const amountInput = document.getElementById('payment_amount');
+  if (show) {
+    amountInput.focus();
+  } else {
+    amountInput.value = '';
+  }
+}
+
+// Run GPS on load
+document.addEventListener('DOMContentLoaded', () => {
+  captureGPS(false);
+});
+</script>
+{% endblock %}
+{% endblock %}
+

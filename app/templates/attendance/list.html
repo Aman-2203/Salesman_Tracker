@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Attendance{% endblock %}
+{% block page_title %}Attendance History{% endblock %}
+{% block page_subtitle %}Working hours and shift logs (dates in dd/mm/yyyy, IST){% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div><h2>Attendance</h2><p>{{ records|length }} records found</p></div>
+</div>
+
+<!-- Search & Filter Bar -->
+<div class="card mb-3" style="padding: 1rem;">
+  <form method="GET" action="{{ url_for('attendance.list_attendance') }}" class="d-flex gap-2 flex-wrap align-center">
+    {% if current_user.role == 'admin' and reps %}
+    <div style="flex: 1; min-width: 150px;">
+      <select name="rep_id" style="width: 100%;">
+        <option value="">— All Reps —</option>
+        {% for r in reps %}
+        <option value="{{ r.id }}" {% if selected_rep == r.id %}selected{% endif %}>{{ r.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div style="flex: 1; min-width: 150px;">
+      <input type="date" name="date" value="{{ selected_date }}" style="width: 100%;" title="Filter by date">
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Filter</button>
+    {% if selected_date or selected_rep %}
+    <a href="{{ url_for('attendance.list_attendance') }}" class="btn btn-ghost btn-sm">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <div class="table-wrapper" style="border:none; border-radius:0;">
+    <table>
+      <thead>
+        <tr>
+          {% if current_user.role == 'admin' %}<th>Rep</th>{% endif %}
+          <th>Date (dd/mm/yyyy)</th><th>Shift Start</th><th>Shift End</th><th>Hours Worked</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          {% if current_user.role == 'admin' %}
+          <td style="font-weight:600;color:var(--text-primary);">{{ r.rep.name }}</td>
+          {% endif %}
+          <td><i class="bi bi-calendar3"></i> {{ r.attendance_date.strftime('%d/%m/%Y') }}</td>
+          <td><i class="bi bi-clock"></i> {{ r.day_start.strftime('%H:%M') if r.day_start else '—' }}</td>
+          <td>{{ r.day_end.strftime('%H:%M') if r.day_end else '<span class="animate-pulse" style="color:var(--success); font-weight:600;"><i class="bi bi-circle-fill"></i> Active</span>' | safe }}</td>
+          <td style="font-weight:600;">{{ r.hours_worked() }}h</td>
+          <td>
+            {% if r.status == 'present' %}<span class="badge badge-success"><i class="bi bi-check-circle-fill"></i> Present</span>
+            {% elif r.status == 'half_day' %}<span class="badge badge-warning"><i class="bi bi-clock"></i> Half Day</span>
+            {% else %}<span class="badge badge-danger"><i class="bi bi-x-circle-fill"></i> Absent</span>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ 6 if current_user.role == 'admin' else 5 }}">
+          <div class="empty-state" style="padding:2rem;">
+            <div class="empty-icon"><i class="bi bi-clock-history"></i></div><h3>No attendance records found</h3>
+            <p>Start your day from the dashboard to record attendance.</p>
+          </div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

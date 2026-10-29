@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% block title %}My Dashboard{% endblock %}
+{% block page_title %}Good {{ 'morning' if now and now.hour < 12 else ('afternoon' if now and now.hour < 17 else 'evening') }}, {{ current_user.name.split()[0] if current_user.name else 'there' }}!{% endblock %}
+{% block page_subtitle %}{{ today.strftime('%A, %d/%m/%Y') }}{% endblock %}
+
+{% block topbar_actions %}
+<span id="live-clock" style="font-size:1rem; font-weight:700; color:var(--accent); letter-spacing:0.05em;"></span>
+{% endblock %}
+
+{% block content %}
+<!-- Attendance Punch Card & Summary Row -->
+<div class="rep-hero-layout mb-3">
+  <div class="punch-card">
+    <div class="text-muted fs-sm mb-1">TODAY'S ATTENDANCE</div>
+    <div class="punch-time" id="punch-clock">--:--:--</div>
+    <div class="punch-date">{{ today.strftime('%d/%m/%Y') }}</div>
+
+    {% if active_attendance %}
+    <!-- Active Session — show end option -->
+    <div class="badge badge-success mb-2" style="font-size:0.85rem; padding: 0.4rem 1rem;">
+      <i class="bi bi-circle-fill text-success mr-1"></i> Active session since {{ active_attendance.day_start.strftime('%H:%M') }}
+    </div>
+    <form method="POST" action="{{ url_for('attendance.day_end') }}" id="end-form">
+      <input type="hidden" name="lat" id="end-lat">
+      <input type="hidden" name="lng" id="end-lng">
+      <button type="button" class="btn btn-danger btn-block btn-lg" id="end-day-btn"
+              data-get-location data-lat="end-lat" data-lng="end-lng"
+              onclick="handlePunch(this, 'end-form')">
+        <i class="bi bi-moon-stars-fill"></i> End / Stop Shift
+      </button>
+    </form>
+    {% else %}
+    <!-- No Active Session — show Start option -->
+    {% if today_attendances %}
+    <div class="badge badge-default mb-2" style="font-size:0.82rem; padding: 0.35rem 0.85rem;">
+      <i class="bi bi-flag-fill mr-1"></i> {{ today_attendances|length }} session(s) today · {{ total_hours_today }}h total
+    </div>
+    {% endif %}
+    <form method="POST" action="{{ url_for('attendance.day_start') }}" id="start-form">
+      <input type="hidden" name="lat" id="start-lat">
+      <input type="hidden" name="lng" id="start-lng">
+      <button type="button" class="btn btn-success btn-lg btn-block" id="start-day-btn"
+              data-get-location data-lat="start-lat" data-lng="start-lng"
+              onclick="handlePunch(this, 'start-form')">
+        <i class="bi bi-sun-fill"></i> {{ 'Start New Session' if today_attendances else 'Start My Day' }}
+      </button>
+    </form>
+    {% endif %}
+
+    {% if today_attendances %}
+    <div class="mt-2 text-muted fs-xs">
+      {% for s in today_attendances %}
+        <span style="display:inline-block; margin: 2px 3px; padding: 2px 6px; background: rgba(0,0,0,0.04); border-radius: 4px;">
+          #{{ loop.index }}: {{ s.day_start.strftime('%H:%M') }} - {{ s.day_end.strftime('%H:%M') if s.day_end else 'Active' }} ({{ s.hours_worked() }}h)
+        </span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Today's Summary Stats -->
+  <div class="grid grid-3">
+    <div class="stat-card">
+      <div class="stat-icon red"><i class="bi bi-geo-alt-fill"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ today_visits|length }}</div>
+        <div class="stat-label">Visits Today</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon amber"><i class="bi bi-cart3"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ today_orders|length }}</div>
+        <div class="stat-label">Orders Today</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon purple"><i class="bi bi-currency-rupee"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.35rem;">₹{{ '{:,.0f}'.format(today_order_value) }}</div>
+        <div class="stat-label">Order Value</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green"><i class="bi bi-credit-card"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ today_payments|length }}</div>
+        <div class="stat-label">Collections</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green"><i class="bi bi-cash-stack"></i></div>
+      <div class="stat-body">
+        <div class="stat-value" style="font-size:1.35rem;">₹{{ '{:,.0f}'.format(today_payment_value) }}</div>
+        <div class="stat-label">Collected</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon blue"><i class="bi bi-shop"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ my_customers|length }}</div>
+        <div class="stat-label">All Customers</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="d-flex gap-2 mb-3 flex-wrap align-center">
+  {% if active_attendance %}
+  <a href="{{ url_for('visits.record_visit') }}" class="btn btn-primary btn-lg" style="box-shadow:var(--shadow-red);">
+    <i class="bi bi-geo-alt-fill"></i> Record Customer Visit
+  </a>
+  {% else %}
+  <button class="btn btn-primary btn-lg" disabled style="opacity: 0.6; cursor: not-allowed;" title="Start your day above to record visits">
+    <i class="bi bi-geo-alt-fill"></i> Record Customer Visit
+  </button>
+  <span class="fs-sm font-semibold text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Start your day first to record visits</span>
+  {% endif %}
+</div>
+
+<!-- Today's Visits Log -->
+<div class="card">
+  <div class="card-header">
+    <div>
+      <span class="card-title"><i class="bi bi-geo-alt"></i> Today's Visits</span>
+      <span class="text-muted fs-xs ml-1">({{ today_visits|length }} logged)</span>
+    </div>
+    {% if active_attendance %}
+    <a href="{{ url_for('visits.record_visit') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg"></i> Record Visit
+    </a>
+    {% endif %}
+  </div>
+
+  {% if today_visits %}
+    {% for v in today_visits %}
+    <div class="visit-card status-completed mb-2">
+      <div class="visit-number" style="background:var(--red-50); border:1px solid var(--border-red); color:var(--red-700);">
+        {{ loop.index }}
+      </div>
+      <div class="visit-info">
+        <div class="d-flex align-center gap-1 flex-wrap">
+          <div class="visit-name" style="margin-bottom:0;">{{ v.customer.name }}</div>
+          {% if v.outcome == 'met' %}
+            <span class="badge badge-success"><i class="bi bi-hand-thumbs-up-fill"></i> Met</span>
+          {% elif v.outcome == 'not_met' %}
+            <span class="badge badge-danger"><i class="bi bi-hand-thumbs-down-fill"></i> Not Met</span>
+          {% elif v.outcome == 'follow_up' %}
+            <span class="badge badge-warning"><i class="bi bi-arrow-repeat"></i> Follow-up</span>
+          {% endif %}
+        </div>
+        <div class="visit-meta mt-1">
+          <span><i class="bi bi-shop"></i> {{ v.customer.area or 'No area' }}</span>
+          {% if v.check_in_time %}
+          <span><i class="bi bi-clock"></i> {{ v.check_in_time.strftime('%H:%M') }}</span>
+          {% endif %}
+          {% if v.check_in_lat and v.check_in_lng %}
+          <a href="https://www.google.com/maps?q={{ v.check_in_lat }},{{ v.check_in_lng }}" target="_blank" rel="noopener noreferrer" class="badge badge-info fs-xs" style="text-decoration:none;">
+            <i class="bi bi-geo-alt-fill"></i> {{ '%.4f'|format(v.check_in_lat) }}, {{ '%.4f'|format(v.check_in_lng) }} <i class="bi bi-box-arrow-up-right"></i>
+          </a>
+          {% endif %}
+          {% if v.notes %}
+          <span class="text-secondary"><i class="bi bi-chat-left-text"></i> {{ v.notes }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state" style="padding: 2.5rem 1rem;">
+      <div class="empty-icon"><i class="bi bi-geo-alt"></i></div>
+      <h3>No visits recorded yet today</h3>
+      <p>When you arrive at a retailer or store, tap below to log your visit, orders, and payment collection in one step.</p>
+      {% if active_attendance %}
+      <a href="{{ url_for('visits.record_visit') }}" class="btn btn-primary mt-2"><i class="bi bi-geo-alt-fill"></i> Record Customer Visit</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Sync punch clock with live-clock
+const punchClock = document.getElementById('punch-clock');
+function tickPunch() {
+  if (!punchClock) return;
+  const now = new Date();
+  punchClock.textContent = now.toLocaleTimeString('en-IN', { hour12: false });
+}
+tickPunch();
+setInterval(tickPunch, 1000);
+
+// Handle attendance punch with GPS
+function handlePunch(btn, formId) {
+  const form = document.getElementById(formId);
+  const latField = btn.dataset.lat;
+  const lngField = btn.dataset.lng;
+
+  btn.disabled = true;
+  btn.innerHTML = '📡 Getting location...';
+
+  if (!navigator.geolocation) {
+    form.submit();
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      document.getElementById(latField).value = pos.coords.latitude;
+      document.getElementById(lngField).value = pos.coords.longitude;
+      form.submit();
+    },
+    () => { form.submit(); },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+</script>
+{% endblock %}

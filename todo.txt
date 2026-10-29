@@ -1,0 +1,3 @@
+5. alternate for database
+6. use unmae nd psswd instead of mail
+14. based on the above changes admin panel will also change so update that.
