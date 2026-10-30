@@ -166,13 +166,14 @@
         <textarea id="notes" name="notes" placeholder="Items discussed, follow-up timeline, retailer feedback..."></textarea>
       </div>
 
-      <!-- Submit Buttons -->
-      <div class="d-flex gap-2 mt-3">
-        <button type="submit" class="btn btn-primary btn-lg" style="flex:1;">
+      <!-- Submit Buttons (Mobile-first responsive action bar) -->
+      <div class="d-flex flex-column gap-2 mt-3">
+        <button type="submit" class="btn btn-primary btn-lg w-100" style="justify-content:center;">
           <i class="bi bi-check-lg"></i> Complete & Save Visit
         </button>
-        <a href="{{ url_for('rep.dashboard') }}" class="btn btn-ghost btn-lg">
-          <i class="bi bi-arrow-left"></i> Cancel
+        <a href="{{ url_for('rep.dashboard') if current_user.role == 'rep' else url_for('admin.dashboard') }}" 
+           class="btn btn-ghost w-100" style="justify-content:center; padding:0.65rem 1rem;">
+          <i class="bi bi-arrow-left"></i> Cancel & Return
         </a>
       </div>
     </form>

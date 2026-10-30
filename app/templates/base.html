@@ -7,6 +7,9 @@
   <meta name="description" content="TraceIt — Field Sales Force Automation & Tracker.">
   <meta name="theme-color" content="#dc2626">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23dc2626'/><text y='.78em' x='.18em' font-size='65' fill='white'>📍</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -135,6 +138,9 @@
         <span class="topbar-date"><i class="bi bi-calendar3"></i> {{ now.strftime('%d/%m/%Y') if now else '' }}</span>
         {% endif %}
         {% block topbar_actions %}{% endblock %}
+        <a href="{{ url_for('auth.logout') }}" class="mobile-topbar-logout" title="Logout">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
       </div>
     </header>
 

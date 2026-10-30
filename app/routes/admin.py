@@ -264,11 +264,15 @@ def reports_attendance():
     if rep_id:
         query = query.filter_by(rep_id=rep_id)
     if month:
-        year, m = month.split('-')
-        query = query.filter(
-            func.strftime('%Y', Attendance.attendance_date) == year,
-            func.strftime('%m', Attendance.attendance_date) == m
-        )
+        try:
+            year, m = map(int, month.split('-'))
+            import calendar
+            _, last_day = calendar.monthrange(year, m)
+            start_d = date(year, m, 1)
+            end_d = date(year, m, last_day)
+            query = query.filter(Attendance.attendance_date >= start_d, Attendance.attendance_date <= end_d)
+        except Exception:
+            pass
 
     records = query.order_by(Attendance.attendance_date.desc(), Attendance.day_start.desc(), Attendance.id.desc()).all()
     reps = User.query.filter_by(role='rep').all()

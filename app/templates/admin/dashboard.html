@@ -3,24 +3,25 @@
 {% block page_title %}Admin Command Center{% endblock %}
 {% block page_subtitle %}Field sales conversion, dual-hits & debt recovery insights — {{ today.strftime('%d/%m/%Y') }}{% endblock %}
 
-{% block topbar_actions %}
-<div class="d-flex gap-1 align-center">
-  <a href="{{ url_for('admin.dashboard', timeframe='today') }}" class="btn btn-sm {% if timeframe == 'today' %}btn-primary{% else %}btn-ghost{% endif %}">
-    Today
-  </a>
-  <a href="{{ url_for('admin.dashboard', timeframe='week') }}" class="btn btn-sm {% if timeframe == 'week' %}btn-primary{% else %}btn-ghost{% endif %}">
-    This Week
-  </a>
-  <a href="{{ url_for('admin.dashboard', timeframe='month') }}" class="btn btn-sm {% if timeframe == 'month' %}btn-primary{% else %}btn-ghost{% endif %}">
-    This Month
-  </a>
-  <a href="{{ url_for('admin.dashboard', timeframe='all') }}" class="btn btn-sm {% if timeframe == 'all' %}btn-primary{% else %}btn-ghost{% endif %}">
-    All Time
-  </a>
-</div>
-{% endblock %}
-
 {% block content %}
+<!-- Timeframe Switcher (Scrollable Pill Chips for Mobile & Desktop) -->
+<div class="timeframe-pill-bar mb-3">
+  <span class="fs-xs text-muted font-weight-bold d-none-mobile" style="text-transform:uppercase; letter-spacing:0.05em; margin-right:0.35rem;">Timeframe:</span>
+  <div class="filter-chips-wrapper">
+    <a href="{{ url_for('admin.dashboard', timeframe='today') }}" class="filter-chip {% if timeframe == 'today' %}active{% endif %}">
+      Today
+    </a>
+    <a href="{{ url_for('admin.dashboard', timeframe='week') }}" class="filter-chip {% if timeframe == 'week' %}active{% endif %}">
+      This Week
+    </a>
+    <a href="{{ url_for('admin.dashboard', timeframe='month') }}" class="filter-chip {% if timeframe == 'month' %}active{% endif %}">
+      This Month
+    </a>
+    <a href="{{ url_for('admin.dashboard', timeframe='all') }}" class="filter-chip {% if timeframe == 'all' %}active{% endif %}">
+      All Time
+    </a>
+  </div>
+</div>
 <!-- Core 3 Insights & Field Presence KPIs -->
 <div class="grid grid-4 mb-3">
   <!-- 1. Order Strike Rate -->
