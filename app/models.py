@@ -24,7 +24,6 @@ class User(UserMixin, db.Model):
     payments = db.relationship('Payment', backref='rep', lazy=True, foreign_keys='Payment.rep_id')
     locations = db.relationship('RepLocation', backref='rep', lazy=True)
     customers = db.relationship('Customer', backref='assigned_rep', lazy=True, foreign_keys='Customer.assigned_rep_id')
-    beat_routes = db.relationship('BeatRoute', backref='rep', lazy=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -74,9 +73,26 @@ class Visit(db.Model):
     check_out_lng = db.Column(db.Float)
     status = db.Column(db.String(30), default='planned')  # planned, checked_in, completed, missed, skipped
     outcome = db.Column(db.String(30))  # met, not_met, follow_up
+    has_order = db.Column(db.Boolean, default=False)
+    has_payment = db.Column(db.Boolean, default=False)
     notes = db.Column(db.Text)
     photo_url = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def is_dual_hit(self):
+        """Visit where both an order and a payment were secured."""
+        return bool(self.has_order and self.has_payment)
+
+    @property
+    def is_cash_rescue(self):
+        """Debt recovery visit: payment collected but no new order placed."""
+        return bool(self.has_payment and not self.has_order)
+
+    @property
+    def is_order_only(self):
+        """Order secured without payment collection."""
+        return bool(self.has_order and not self.has_payment)
 
     def duration_minutes(self):
         if self.check_in_time and self.check_out_time:
@@ -86,27 +102,6 @@ class Visit(db.Model):
 
     def __repr__(self):
         return f'<Visit {self.id} rep={self.rep_id} customer={self.customer_id}>'
-
-
-class BeatRoute(db.Model):
-    __tablename__ = 'beat_routes'
-    id = db.Column(db.Integer, primary_key=True)
-    rep_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    route_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
-    customer_ids_json = db.Column(db.Text, default='[]')  # JSON list of customer IDs in order
-    name = db.Column(db.String(100))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    @property
-    def customer_ids(self):
-        return json.loads(self.customer_ids_json or '[]')
-
-    @customer_ids.setter
-    def customer_ids(self, value):
-        self.customer_ids_json = json.dumps(value)
-
-    def __repr__(self):
-        return f'<BeatRoute {self.id} rep={self.rep_id} date={self.route_date}>'
 
 
 class Order(db.Model):

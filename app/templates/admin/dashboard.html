@@ -1,61 +1,98 @@
 {% extends 'base.html' %}
 {% block title %}Admin Dashboard{% endblock %}
-{% block page_title %}Admin Dashboard{% endblock %}
-{% block page_subtitle %}Live overview — {{ today.strftime('%A, %d/%m/%Y') }}{% endblock %}
+{% block page_title %}Admin Command Center{% endblock %}
+{% block page_subtitle %}Field sales conversion, dual-hits & debt recovery insights — {{ today.strftime('%d/%m/%Y') }}{% endblock %}
+
+{% block topbar_actions %}
+<div class="d-flex gap-1 align-center">
+  <a href="{{ url_for('admin.dashboard', timeframe='today') }}" class="btn btn-sm {% if timeframe == 'today' %}btn-primary{% else %}btn-ghost{% endif %}">
+    Today
+  </a>
+  <a href="{{ url_for('admin.dashboard', timeframe='week') }}" class="btn btn-sm {% if timeframe == 'week' %}btn-primary{% else %}btn-ghost{% endif %}">
+    This Week
+  </a>
+  <a href="{{ url_for('admin.dashboard', timeframe='month') }}" class="btn btn-sm {% if timeframe == 'month' %}btn-primary{% else %}btn-ghost{% endif %}">
+    This Month
+  </a>
+  <a href="{{ url_for('admin.dashboard', timeframe='all') }}" class="btn btn-sm {% if timeframe == 'all' %}btn-primary{% else %}btn-ghost{% endif %}">
+    All Time
+  </a>
+</div>
+{% endblock %}
 
 {% block content %}
-<!-- KPI Row -->
+<!-- Core 3 Insights & Field Presence KPIs -->
 <div class="grid grid-4 mb-3">
-  <div class="stat-card">
-    <div class="stat-icon red"><i class="bi bi-people"></i></div>
+  <!-- 1. Order Strike Rate -->
+  <div class="stat-card" style="border-top: 3px solid var(--accent);">
+    <div class="stat-icon red"><i class="bi bi-bullseye"></i></div>
     <div class="stat-body">
-      <div class="stat-value">{{ total_reps }}</div>
-      <div class="stat-label">Active Reps</div>
-      <div class="stat-change up">{{ today_attendance }} online today</div>
+      <div class="stat-value" style="font-size:1.85rem; color:var(--accent);">{{ team_strike_rate }}%</div>
+      <div class="stat-label">Order Strike Rate</div>
+      <div class="stat-change up">
+        <i class="bi bi-cart-check"></i> {{ total_order_visits }} Orders / {{ total_met_visits }} Met Visits
+      </div>
     </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon red"><i class="bi bi-geo-alt-fill"></i></div>
+
+  <!-- 2. Dual-Hit Index -->
+  <div class="stat-card" style="border-top: 3px solid var(--success);">
+    <div class="stat-icon green"><i class="bi bi-people-fill"></i></div>
     <div class="stat-body">
-      <div class="stat-value">{{ today_visits }}</div>
-      <div class="stat-label">Visits Today</div>
-      <div class="stat-change up">Recorded with GPS</div>
+      <div class="stat-value" style="font-size:1.85rem; color:var(--success);">{{ total_dual_hits }}</div>
+      <div class="stat-label">Dual-Hit Visits <i class="bi bi-award-fill"></i></div>
+      <div class="stat-change up" style="color:var(--success);">
+        Order + Payment in Same Visit
+      </div>
     </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon amber"><i class="bi bi-cart3"></i></div>
+
+  <!-- 3. Debt Recovery / Cash Rescue -->
+  <div class="stat-card" style="border-top: 3px solid #d97706;">
+    <div class="stat-icon amber"><i class="bi bi-shield-check"></i></div>
     <div class="stat-body">
-      <div class="stat-value">{{ today_orders }}</div>
-      <div class="stat-label">Orders Today</div>
-      <div class="stat-change up">₹{{ '{:,.0f}'.format(today_order_value) }}</div>
+      <div class="stat-value" style="font-size:1.85rem; color:#d97706;">{{ total_cash_rescues }}</div>
+      <div class="stat-label">Cash Rescues <i class="bi bi-shield-check"></i></div>
+      <div class="stat-change up" style="color:#b45309;">
+        Payment Collected (No Order)
+      </div>
     </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon green"><i class="bi bi-cash-stack"></i></div>
+
+  <!-- 4. Field Attendance -->
+  <div class="stat-card" style="border-top: 3px solid var(--info);">
+    <div class="stat-icon blue"><i class="bi bi-person-check-fill"></i></div>
     <div class="stat-body">
-      <div class="stat-value">{{ today_collections }}</div>
-      <div class="stat-label">Collections Today</div>
-      <div class="stat-change up">₹{{ '{:,.0f}'.format(today_collection_value) }}</div>
+      <div class="stat-value" style="font-size:1.85rem;">{{ today_attendance }} / {{ total_reps }}</div>
+      <div class="stat-label">Active Field Force</div>
+      <div class="stat-change up">
+        {{ total_scoped_visits }} visits logged ({{ time_label }})
+      </div>
     </div>
   </div>
 </div>
 
 <div class="dashboard-main-grid mb-3">
-  <!-- Team Activity Table -->
+  <!-- Rep Performance & Conversion Scorecard -->
   <div class="card" style="padding:0; overflow:hidden;">
     <div class="card-header" style="padding:1.25rem 1.5rem;">
-      <span class="card-title">Team Activity Today</span>
-      <span class="live-dot"></span>
+      <div>
+        <span class="card-title">Rep Conversion Scorecard</span>
+        <span class="text-muted fs-xs ml-1">({{ time_label }})</span>
+      </div>
+      <span class="live-dot" title="Live data"></span>
     </div>
     <div class="table-wrapper" style="border:none; border-radius:0;">
       <table>
         <thead>
           <tr>
-            <th>Rep</th>
-            <th>Status</th>
-            <th>Visits Today</th>
-            <th>Orders</th>
-            <th>Last Seen</th>
+            <th>Sales Rep</th>
+            <th title="Total visits where retailer was met">Met Visits</th>
+            <th title="Visits that successfully generated an order">Orders</th>
+            <th title="Percentage of met visits that resulted in an order">Strike Rate</th>
+            <th title="Visits securing both order and payment">Dual-Hits <i class="bi bi-award-fill"></i></th>
+            <th title="Visits recovering dues without order">Cash Rescues <i class="bi bi-shield-check"></i></th>
+            <th>Shift</th>
           </tr>
         </thead>
         <tbody>
@@ -73,6 +110,33 @@
               </div>
             </td>
             <td>
+              <span style="font-weight:600; color:var(--text-secondary);">{{ item.met_count }}</span>
+              <span class="text-muted fs-xs">/ {{ item.visits_count }}</span>
+            </td>
+            <td>
+              <span style="font-weight:700; color:var(--success);">{{ item.orders_secured }}</span>
+            </td>
+            <td>
+              <span class="badge {% if item.strike_rate >= 70 %}badge-success{% elif item.strike_rate >= 40 %}badge-warning{% else %}badge-default{% endif %}"
+                    style="font-weight:700; font-size:0.8rem;">
+                🎯 {{ item.strike_rate }}%
+              </span>
+            </td>
+            <td>
+              {% if item.dual_hits > 0 %}
+                <span class="badge badge-success" style="font-weight:700;">🤝 {{ item.dual_hits }}</span>
+              {% else %}
+                <span class="text-muted fs-xs">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.cash_rescues > 0 %}
+                <span class="badge badge-warning" style="font-weight:700;">🛡️ {{ item.cash_rescues }}</span>
+              {% else %}
+                <span class="text-muted fs-xs">—</span>
+              {% endif %}
+            </td>
+            <td>
               {% if item.attendance and item.attendance.day_start %}
                 {% if item.attendance.day_end %}
                   <span class="badge badge-default"><i class="bi bi-flag-fill"></i> Done</span>
@@ -83,19 +147,9 @@
                 <span class="badge badge-danger"><i class="bi bi-dash-circle"></i> Offline</span>
               {% endif %}
             </td>
-            <td>
-              <span style="font-weight:700;color:var(--text-primary);">{{ item.visits_today }}</span>
-            </td>
-            <td><span style="font-weight:600;color:var(--success);">{{ item.orders_today }}</span></td>
-            <td class="fs-xs text-muted">
-              {% if item.last_visit %}
-                <span style="font-weight:600;color:var(--text-secondary);">{{ item.last_visit.check_in_time.strftime('%H:%M') }}</span>
-                · {{ item.last_visit.customer.name }}
-              {% else %}—{% endif %}
-            </td>
           </tr>
           {% else %}
-          <tr><td colspan="5" class="text-center text-muted" style="padding:2rem;">No reps found</td></tr>
+          <tr><td colspan="7" class="text-center text-muted" style="padding:2rem;">No reps found</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -105,10 +159,10 @@
   <!-- Live Map -->
   <div class="card" style="padding:0; overflow:hidden;">
     <div class="card-header" style="padding:1.25rem 1.5rem;">
-      <span class="card-title">Live Rep Site Visits</span>
+      <span class="card-title">Live Site Visits Map</span>
       <span class="d-flex align-center gap-1">
         <span class="live-dot"></span>
-        <span class="fs-xs text-muted">From customer visit check-ins</span>
+        <span class="fs-xs text-muted">Field check-ins</span>
       </span>
     </div>
     <div id="live-map" style="border-radius:0; border:none; height:360px;"></div>
@@ -116,7 +170,7 @@
 </div>
 
 <div class="grid grid-2">
-  <!-- Recent Visits with GPS Location -->
+  <!-- Recent Visits with Smart Classification Tags -->
   <div class="card" style="padding:0; overflow:hidden;">
     <div class="card-header" style="padding:1.25rem 1.5rem;">
       <span class="card-title">Recent Customer Visits</span>
@@ -128,9 +182,8 @@
           <tr>
             <th>Rep</th>
             <th>Customer</th>
-            <th>Location (GPS)</th>
-            <th>Outcome</th>
-            <th>Time</th>
+            <th>Visit Classification</th>
+            <th>Time (IST)</th>
           </tr>
         </thead>
         <tbody>
@@ -139,20 +192,17 @@
             <td style="font-weight:600;color:var(--text-primary);">{{ v.rep.name }}</td>
             <td>
               <div style="font-weight:600;">{{ v.customer.name }}</div>
-              <div class="fs-xs text-muted">{{ v.customer.area or '' }}</div>
+              <div class="fs-xs text-muted"><i class="bi bi-geo-alt"></i> {{ v.customer.area or 'No area' }}</div>
             </td>
             <td>
-              {% if v.check_in_lat and v.check_in_lng %}
-              <a href="https://www.google.com/maps?q={{ v.check_in_lat }},{{ v.check_in_lng }}" target="_blank" rel="noopener noreferrer" class="badge badge-info" title="Open GPS location in Google Maps">
-                <i class="bi bi-geo-alt-fill"></i> {{ '%.4f'|format(v.check_in_lat) }}, {{ '%.4f'|format(v.check_in_lng) }} <i class="bi bi-box-arrow-up-right"></i>
-              </a>
-              {% else %}
-              <span class="badge badge-default">No GPS</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if v.outcome == 'met' %}
-                <span class="badge badge-success"><i class="bi bi-hand-thumbs-up-fill"></i> Met</span>
+              {% if v.is_dual_hit %}
+                <span class="badge badge-success" title="Both Order and Payment Secured"><i class="bi bi-award-fill"></i> Dual-Hit</span>
+              {% elif v.is_cash_rescue %}
+                <span class="badge badge-warning" title="Debt Recovery: Payment Collected without Order"><i class="bi bi-shield-check"></i> Cash Rescue</span>
+              {% elif v.is_order_only %}
+                <span class="badge badge-info" title="Order Booked"><i class="bi bi-cart-check-fill"></i> Order Only</span>
+              {% elif v.outcome == 'met' %}
+                <span class="badge badge-default"><i class="bi bi-hand-thumbs-up-fill"></i> Met</span>
               {% elif v.outcome == 'not_met' %}
                 <span class="badge badge-danger"><i class="bi bi-hand-thumbs-down-fill"></i> Not Met</span>
               {% elif v.outcome == 'follow_up' %}
@@ -166,28 +216,25 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="5" class="text-center text-muted" style="padding:2rem;">No visits logged yet</td></tr>
+          <tr><td colspan="4" class="text-center text-muted" style="padding:2rem;">No visits logged yet</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Quick Stats & Collection Summary -->
+  <!-- Quick Action & Team Summary -->
   <div>
-    <div class="card mb-2">
-      <div class="card-title mb-2">Weekly Order Value</div>
-      <div class="stat-value" style="font-size:2rem;color:var(--success);">₹{{ '{:,.0f}'.format(weekly_orders_value) }}</div>
-      <div class="text-muted fs-sm mt-1">Confirmed orders booked this week</div>
-    </div>
-
-    <div class="card mb-2">
-      <div class="card-title mb-2">Today's Collections</div>
-      <div class="stat-value" style="font-size:2rem;color:var(--text-primary);">₹{{ '{:,.0f}'.format(today_collection_value) }}</div>
-      <div class="d-flex gap-2 mt-2 flex-wrap">
+    <div class="card mb-2" style="background:var(--red-50); border:1px solid var(--border-red);">
+      <div class="card-title mb-1" style="color:var(--accent);"><i class="bi bi-stars"></i> What Makes a High-Yield Shift?</div>
+      <p class="fs-sm text-secondary mb-2" style="line-height:1.5;">
+        <strong>Strike Rate:</strong> Turning retailer meetings into booked orders without pressuring reps on basket size.<br>
+        <strong>Dual-Hits:</strong> The gold standard — securing an order and collecting payments in one sit-down.<br>
+        <strong>Cash Rescues:</strong> Cleaning up overdue retailer debt even when no new order is booked.
+      </p>
+      <div class="d-flex gap-2 flex-wrap">
         <span class="badge badge-success"><i class="bi bi-credit-card"></i> {{ today_collections }} Collection(s)</span>
         <span class="badge badge-info"><i class="bi bi-cart3"></i> {{ today_orders }} Order(s)</span>
-        <span class="badge badge-default"><i class="bi bi-geo-alt"></i> {{ today_visits }} Visit(s)</span>
       </div>
     </div>
 

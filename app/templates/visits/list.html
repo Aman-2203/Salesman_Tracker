@@ -32,9 +32,17 @@
     <div style="flex: 1; min-width: 130px;">
       <select name="outcome" style="width: 100%;">
         <option value="">— All Outcomes —</option>
-        <option value="met" {% if selected_outcome == 'met' %}selected{% endif %}>👍 Met</option>
-        <option value="not_met" {% if selected_outcome == 'not_met' %}selected{% endif %}>👎 Not Met</option>
-        <option value="follow_up" {% if selected_outcome == 'follow_up' %}selected{% endif %}>🔄 Follow-up</option>
+        <option value="met" {% if selected_outcome == 'met' %}selected{% endif %}>Met</option>
+        <option value="not_met" {% if selected_outcome == 'not_met' %}selected{% endif %}>Not Met</option>
+        <option value="follow_up" {% if selected_outcome == 'follow_up' %}selected{% endif %}>Follow-up</option>
+      </select>
+    </div>
+    <div style="flex: 1; min-width: 150px;">
+      <select name="visit_type" style="width: 100%;">
+        <option value="">— All Classifications —</option>
+        <option value="dual_hit" {% if selected_type == 'dual_hit' %}selected{% endif %}>Dual-Hit (Order + Cash)</option>
+        <option value="cash_rescue" {% if selected_type == 'cash_rescue' %}selected{% endif %}>Cash Rescue (Debt Rec.)</option>
+        <option value="order_only" {% if selected_type == 'order_only' %}selected{% endif %}>Order Only</option>
       </select>
     </div>
     {% if current_user.role == 'admin' and reps %}
@@ -51,7 +59,7 @@
       <input type="date" name="date" value="{{ selected_date }}" style="width: 100%;" title="Filter by date">
     </div>
     <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Filter</button>
-    {% if selected_q or selected_outcome or selected_date or selected_rep %}
+    {% if selected_q or selected_outcome or selected_type or selected_date or selected_rep %}
     <a href="{{ url_for('visits.list_visits') }}" class="btn btn-ghost btn-sm">Clear</a>
     {% endif %}
   </form>
@@ -96,15 +104,25 @@
             {% endif %}
           </td>
           <td>
-            {% if v.outcome == 'met' %}
-              <span class="badge badge-success"><i class="bi bi-hand-thumbs-up-fill"></i> Met</span>
-            {% elif v.outcome == 'not_met' %}
-              <span class="badge badge-danger"><i class="bi bi-hand-thumbs-down-fill"></i> Not Met</span>
-            {% elif v.outcome == 'follow_up' %}
-              <span class="badge badge-warning"><i class="bi bi-arrow-repeat"></i> Follow-up</span>
-            {% else %}
-              <span class="badge badge-default"><i class="bi bi-check-circle-fill"></i> Visited</span>
-            {% endif %}
+            <div class="d-flex flex-column gap-1">
+              {% if v.is_dual_hit %}
+                <span class="badge badge-success" title="Both Order and Payment Secured"><i class="bi bi-award-fill"></i> Dual-Hit</span>
+              {% elif v.is_cash_rescue %}
+                <span class="badge badge-warning" title="Debt Recovery: Payment Collected without Order"><i class="bi bi-shield-check"></i> Cash Rescue</span>
+              {% elif v.is_order_only %}
+                <span class="badge badge-info" title="Order Booked"><i class="bi bi-cart-check-fill"></i> Order Only</span>
+              {% endif %}
+
+              {% if v.outcome == 'met' %}
+                <span class="badge badge-default" style="font-size:0.75rem;"><i class="bi bi-hand-thumbs-up-fill text-success"></i> Met</span>
+              {% elif v.outcome == 'not_met' %}
+                <span class="badge badge-danger" style="font-size:0.75rem;"><i class="bi bi-hand-thumbs-down-fill"></i> Not Met</span>
+              {% elif v.outcome == 'follow_up' %}
+                <span class="badge badge-warning" style="font-size:0.75rem;"><i class="bi bi-arrow-repeat"></i> Follow-up</span>
+              {% else %}
+                <span class="badge badge-default" style="font-size:0.75rem;"><i class="bi bi-check-circle-fill"></i> Visited</span>
+              {% endif %}
+            </div>
           </td>
           <td style="max-width:240px; font-size:0.82rem; color:var(--text-secondary);">
             {{ v.notes or '—' }}

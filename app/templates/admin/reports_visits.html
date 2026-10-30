@@ -23,6 +23,15 @@
       </select>
     </div>
     <div class="form-group">
+      <label>Classification</label>
+      <select name="visit_type">
+        <option value="">All Types</option>
+        <option value="dual_hit" {% if visit_type == 'dual_hit' %}selected{% endif %}>Dual-Hit (Order + Cash)</option>
+        <option value="cash_rescue" {% if visit_type == 'cash_rescue' %}selected{% endif %}>Cash Rescue (Debt Rec.)</option>
+        <option value="order_only" {% if visit_type == 'order_only' %}selected{% endif %}>Order Only</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label>From Date</label>
       <input type="date" name="start_date" value="{{ start_date or '' }}">
     </div>
@@ -72,15 +81,25 @@
             {% endif %}
           </td>
           <td>
-            {% if v.outcome == 'met' %}
-              <span class="badge badge-success"><i class="bi bi-hand-thumbs-up-fill"></i> Met</span>
-            {% elif v.outcome == 'not_met' %}
-              <span class="badge badge-danger"><i class="bi bi-hand-thumbs-down-fill"></i> Not Met</span>
-            {% elif v.outcome == 'follow_up' %}
-              <span class="badge badge-warning"><i class="bi bi-arrow-repeat"></i> Follow-up</span>
-            {% else %}
-              <span class="badge badge-default"><i class="bi bi-check-circle-fill"></i> Visited</span>
-            {% endif %}
+            <div class="d-flex flex-column gap-1">
+              {% if v.is_dual_hit %}
+                <span class="badge badge-success" title="Both Order and Payment Secured"><i class="bi bi-award-fill"></i> Dual-Hit</span>
+              {% elif v.is_cash_rescue %}
+                <span class="badge badge-warning" title="Debt Recovery: Payment Collected without Order"><i class="bi bi-shield-check"></i> Cash Rescue</span>
+              {% elif v.is_order_only %}
+                <span class="badge badge-info" title="Order Booked"><i class="bi bi-cart-check-fill"></i> Order Only</span>
+              {% endif %}
+
+              {% if v.outcome == 'met' %}
+                <span class="badge badge-default" style="font-size:0.75rem;"><i class="bi bi-hand-thumbs-up-fill text-success"></i> Met</span>
+              {% elif v.outcome == 'not_met' %}
+                <span class="badge badge-danger" style="font-size:0.75rem;"><i class="bi bi-hand-thumbs-down-fill"></i> Not Met</span>
+              {% elif v.outcome == 'follow_up' %}
+                <span class="badge badge-warning" style="font-size:0.75rem;"><i class="bi bi-arrow-repeat"></i> Follow-up</span>
+              {% else %}
+                <span class="badge badge-default" style="font-size:0.75rem;"><i class="bi bi-check-circle-fill"></i> Visited</span>
+              {% endif %}
+            </div>
           </td>
           <td style="max-width:240px; font-size:0.82rem; color:var(--text-secondary);">
             {{ v.notes or '—' }}
@@ -90,7 +109,7 @@
         <tr>
           <td colspan="6">
             <div class="empty-state" style="padding:2.5rem;">
-              <div class="empty-icon">📋</div>
+              <div class="empty-icon"><i class="bi bi-calendar2-x"></i></div>
               <h3>No visits found</h3>
               <p>Try adjusting your filters or date range.</p>
             </div>

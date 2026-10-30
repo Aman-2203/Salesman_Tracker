@@ -15,6 +15,7 @@ def list_visits():
     today = today_ist()
     q = request.args.get('q', '').strip()
     outcome = request.args.get('outcome', '').strip()
+    visit_type = request.args.get('type', '').strip()
     date_filter = request.args.get('date', '').strip()
     rep_filter = request.args.get('rep_id', type=int)
 
@@ -26,6 +27,13 @@ def list_visits():
 
     if outcome:
         query = query.filter(Visit.outcome == outcome)
+
+    if visit_type == 'dual_hit':
+        query = query.filter(Visit.has_order == True, Visit.has_payment == True)
+    elif visit_type == 'cash_rescue':
+        query = query.filter(Visit.has_payment == True, Visit.has_order == False)
+    elif visit_type == 'order_only':
+        query = query.filter(Visit.has_order == True, Visit.has_payment == False)
 
     if date_filter:
         try:
@@ -60,6 +68,7 @@ def list_visits():
         reps=reps,
         selected_q=q,
         selected_outcome=outcome,
+        selected_type=visit_type,
         selected_date=date_filter,
         selected_rep=rep_filter
     )
@@ -117,6 +126,7 @@ def record_visit():
         # 2. Unified Order Booking (if placed)
         order_placed = request.form.get('order_placed', 'no')
         if order_placed == 'yes':
+            visit.has_order = True
             order_amount = request.form.get('order_amount', type=float) or 0.0
             order = Order(
                 rep_id=current_user.id,
@@ -134,6 +144,7 @@ def record_visit():
         # 3. Unified Payment / Cheque Collection (if collected)
         payment_collected = request.form.get('payment_collected', 'no')
         if payment_collected == 'yes':
+            visit.has_payment = True
             payment_amount = request.form.get('payment_amount', type=float) or 0.0
             cheque_number = request.form.get('cheque_number', '').strip() or f'COL-{now.strftime("%H%M%S")}'
             bank_name = request.form.get('bank_name', '').strip()
@@ -164,18 +175,3 @@ def record_visit():
         selected_customer_id=selected_customer_id,
         today=today_ist()
     )
-
-
-@visits_bp.route('/mark/<int:visit_id>', methods=['GET', 'POST'])
-@login_required
-def mark_visit(visit_id):
-    """Backwards compatibility: redirect to record visit with customer pre-selected."""
-    visit = Visit.query.get_or_404(visit_id)
-    return redirect(url_for('visits.record_visit', customer_id=visit.customer_id))
-
-
-@visits_bp.route('/plan', methods=['GET', 'POST'])
-@login_required
-def plan_beat():
-    """Beat planning removed: redirect to direct visit recording."""
-    return redirect(url_for('visits.record_visit'))

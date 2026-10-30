@@ -7,14 +7,44 @@
 <div style="max-width: 560px; margin: 0 auto;">
   <div class="card">
     <form method="POST" action="{{ url_for('payments.new_payment') }}">
-      <div class="form-group">
-        <label for="customer_id">Customer <span class="required">*</span></label>
-        <select id="customer_id" name="customer_id" required>
-          <option value="">Select customer...</option>
-          {% for c in customers %}
-          <option value="{{ c.id }}">{{ c.name }} — {{ c.area or c.city or 'N/A' }}</option>
-          {% endfor %}
-        </select>
+      <!-- Searchable Customer Field -->
+      <div class="form-group" style="position:relative;">
+        <label for="customer_search_input">Customer / Store <span class="required">*</span></label>
+        
+        <input type="hidden" id="customer_id" name="customer_id" value="" required>
+
+        <!-- Selected Customer Display Card -->
+        <div id="customer_selected_card" class="card" style="display:none; padding:0.65rem 0.9rem; background:var(--blue-50, #eff6ff); border:1px solid #bfdbfe; border-radius:6px; margin-bottom:0.25rem;">
+          <div class="d-flex align-center justify-between">
+            <div class="d-flex align-center gap-2">
+              <i class="bi bi-check-circle-fill text-success" style="font-size:1.2rem;"></i>
+              <div>
+                <div id="selected_customer_name" style="font-weight:700; font-size:0.92rem; color:var(--text-primary);"></div>
+                <div id="selected_customer_meta" class="fs-xs text-muted"></div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn_change_customer" style="padding:0.25rem 0.6rem; font-size:0.8rem;">
+              <i class="bi bi-arrow-repeat"></i> Change
+            </button>
+          </div>
+        </div>
+
+        <!-- Search Input Bar -->
+        <div id="customer_search_wrapper" style="position:relative;">
+          <input type="text" id="customer_search_input" class="form-control"
+                 placeholder="Search customer by name, area, or phone..."
+                 autocomplete="off"
+                 style="padding-left: 2.25rem; width:100%;">
+          <i class="bi bi-search" style="position:absolute; left:0.8rem; top:50%; transform:translateY(-50%); color:var(--text-muted); pointer-events:none;"></i>
+          
+          <!-- Dropdown Search Results Box -->
+          <div id="customer_search_dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:1050; background:var(--bg-card, #fff); border:1px solid var(--border-color, #e5e7eb); border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); max-height:240px; overflow-y:auto;">
+          </div>
+        </div>
+
+        {% if not customers %}
+        <div class="form-hint text-danger mt-1">No active customers found. Please add a customer first.</div>
+        {% endif %}
       </div>
 
       <div class="divider"></div>
@@ -59,5 +89,150 @@
 <script>
 // Default cheque date to today
 document.getElementById('cheque_date').value = new Date().toISOString().split('T')[0];
+
+// Customer Search & Select Component
+(function() {
+  const customerList = [
+    {% for c in customers %}
+    {
+      id: {{ c.id }},
+      name: {{ c.name|tojson }},
+      area: {{ (c.area or c.city or '')|tojson }},
+      phone: {{ (c.phone or '')|tojson }}
+    },
+    {% endfor %}
+  ];
+
+  const hiddenInput = document.getElementById('customer_id');
+  const searchWrapper = document.getElementById('customer_search_wrapper');
+  const searchInput = document.getElementById('customer_search_input');
+  const dropdown = document.getElementById('customer_search_dropdown');
+  const selectedCard = document.getElementById('customer_selected_card');
+  const selectedName = document.getElementById('selected_customer_name');
+  const selectedMeta = document.getElementById('selected_customer_meta');
+  const changeBtn = document.getElementById('btn_change_customer');
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function renderMatches(query) {
+    const q = (query || '').trim().toLowerCase();
+    const matches = customerList.filter(c => {
+      if (!q) return true;
+      return c.name.toLowerCase().includes(q) ||
+             c.area.toLowerCase().includes(q) ||
+             c.phone.toLowerCase().includes(q);
+    });
+
+    if (matches.length === 0) {
+      dropdown.innerHTML = `
+        <div style="padding:0.75rem 1rem; color:var(--text-muted); font-size:0.85rem; text-align:center;">
+          <i class="bi bi-exclamation-circle"></i> No customer found matching "<strong>${escapeHtml(q)}</strong>"
+        </div>
+      `;
+      dropdown.style.display = 'block';
+      return;
+    }
+
+    let html = '';
+    matches.slice(0, 30).forEach(c => {
+      const meta = [
+        c.area ? `<span class="badge badge-default" style="font-size:0.72rem;"><i class="bi bi-geo-alt"></i> ${escapeHtml(c.area)}</span>` : '',
+        c.phone ? `<span class="badge badge-default" style="font-size:0.72rem;"><i class="bi bi-telephone"></i> ${escapeHtml(c.phone)}</span>` : ''
+      ].filter(Boolean).join(' ');
+
+      html += `
+        <div class="customer-item" data-id="${c.id}" style="padding:0.65rem 0.9rem; cursor:pointer; border-bottom:1px solid var(--border-color, #f3f4f6); display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-weight:600; font-size:0.88rem; color:var(--text-primary);">${escapeHtml(c.name)}</div>
+            ${meta ? `<div style="margin-top:0.2rem; display:flex; gap:0.35rem;">${meta}</div>` : ''}
+          </div>
+          <span style="color:var(--text-muted); font-size:0.8rem;"><i class="bi bi-chevron-right"></i></span>
+        </div>
+      `;
+    });
+
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+
+    dropdown.querySelectorAll('.customer-item').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        item.style.backgroundColor = 'var(--bg-subtle, #f8fafc)';
+      });
+      item.addEventListener('mouseleave', () => {
+        item.style.backgroundColor = 'transparent';
+      });
+      item.addEventListener('click', () => {
+        const id = parseInt(item.getAttribute('data-id'), 10);
+        selectCustomer(id);
+      });
+    });
+  }
+
+  function selectCustomer(id) {
+    const cust = customerList.find(c => c.id === id);
+    if (!cust) return;
+
+    hiddenInput.value = cust.id;
+    selectedName.textContent = cust.name;
+    const metaParts = [];
+    if (cust.area) metaParts.push(cust.area);
+    if (cust.phone) metaParts.push(cust.phone);
+    selectedMeta.textContent = metaParts.join(' · ') || 'No area / phone';
+
+    selectedCard.style.display = 'block';
+    searchWrapper.style.display = 'none';
+    dropdown.style.display = 'none';
+    searchInput.value = '';
+  }
+
+  function clearSelection() {
+    hiddenInput.value = '';
+    selectedCard.style.display = 'none';
+    searchWrapper.style.display = 'block';
+    searchInput.value = '';
+    searchInput.focus();
+    renderMatches('');
+  }
+
+  if (changeBtn) {
+    changeBtn.addEventListener('click', clearSelection);
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('focus', () => {
+      renderMatches(searchInput.value);
+    });
+
+    searchInput.addEventListener('input', () => {
+      renderMatches(searchInput.value);
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (searchWrapper && !searchWrapper.contains(e.target) && dropdown) {
+      dropdown.style.display = 'none';
+    }
+  });
+
+  const form = document.querySelector('form');
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      if (!hiddenInput.value) {
+        e.preventDefault();
+        alert('Please search and select a customer before submitting.');
+        clearSelection();
+      }
+    });
+  }
+
+  const initialId = parseInt(hiddenInput.value, 10);
+  if (initialId) {
+    selectCustomer(initialId);
+  }
+})();
 </script>
 {% endblock %}
