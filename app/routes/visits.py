@@ -141,25 +141,69 @@ def record_visit():
             db.session.add(order)
             messages.append(f'Order booked (₹{order_amount:,.2f})')
 
-        # 3. Unified Payment / Cheque Collection (if collected)
+        # 3. Unified Payment / Multiple Cheques Collection (if collected)
         payment_collected = request.form.get('payment_collected', 'no')
         if payment_collected == 'yes':
-            visit.has_payment = True
-            payment_amount = request.form.get('payment_amount', type=float) or 0.0
-            cheque_number = request.form.get('cheque_number', '').strip() or f'COL-{now.strftime("%H%M%S")}'
-            bank_name = request.form.get('bank_name', '').strip()
-            payment = Payment(
-                rep_id=current_user.id,
-                customer_id=customer_id,
-                collection_date=today,
-                cheque_number=cheque_number,
-                cheque_amount=payment_amount,
-                cheque_date=today,
-                bank_name=bank_name,
-                notes=f'From Visit #{visit.id}: {notes}' if notes else f'From Visit #{visit.id}'
-            )
-            db.session.add(payment)
-            messages.append(f'Collection recorded (₹{payment_amount:,.2f})')
+            amounts = request.form.getlist('cheque_amount[]')
+            cheque_numbers = request.form.getlist('cheque_number[]')
+            cheque_dates = request.form.getlist('cheque_date[]')
+            bank_names = request.form.getlist('bank_name[]')
+
+            # Fallback for single legacy input if form posted scalar names
+            if not amounts and request.form.get('payment_amount'):
+                amounts = [request.form.get('payment_amount')]
+                cheque_numbers = [request.form.get('cheque_number', '')]
+                cheque_dates = [request.form.get('cheque_date', '')]
+                bank_names = [request.form.get('bank_name', '')]
+
+            collected_count = 0
+            total_collected = 0.0
+
+            for i in range(len(amounts)):
+                amt_str = amounts[i].strip() if i < len(amounts) else ''
+                if not amt_str:
+                    continue
+                try:
+                    amt = float(amt_str)
+                except (ValueError, TypeError):
+                    continue
+                if amt <= 0:
+                    continue
+
+                chq_num = cheque_numbers[i].strip() if i < len(cheque_numbers) and cheque_numbers[i] else f'COL-{now.strftime("%H%M%S")}-{i+1}'
+                bank = bank_names[i].strip() if i < len(bank_names) and bank_names[i] else ''
+
+                # Parse cheque date (supports current date and post-dated cheques PDC)
+                c_date = today
+                if i < len(cheque_dates) and cheque_dates[i]:
+                    try:
+                        raw_date = cheque_dates[i].strip()
+                        if '/' in raw_date:
+                            parts = raw_date.split('/')
+                            c_date = date(int(parts[2]), int(parts[1]), int(parts[0]))
+                        else:
+                            c_date = datetime.strptime(raw_date, '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        c_date = today
+
+                payment = Payment(
+                    rep_id=current_user.id,
+                    customer_id=customer_id,
+                    collection_date=today,
+                    cheque_number=chq_num,
+                    cheque_amount=amt,
+                    cheque_date=c_date,
+                    bank_name=bank,
+                    notes=f'From Visit #{visit.id}: {notes}' if notes else f'From Visit #{visit.id}'
+                )
+                db.session.add(payment)
+                collected_count += 1
+                total_collected += amt
+
+            if collected_count > 0:
+                visit.has_payment = True
+                cheque_word = 'Cheque' if collected_count == 1 else 'Cheques'
+                messages.append(f'{collected_count} {cheque_word} collected (₹{total_collected:,.2f})')
 
         db.session.commit()
         flash(' · '.join(messages), 'success')

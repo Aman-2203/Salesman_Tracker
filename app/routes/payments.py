@@ -67,37 +67,74 @@ def new_payment():
 
     if request.method == 'POST':
         customer_id = request.form.get('customer_id', type=int)
-        cheque_number = request.form.get('cheque_number', '').strip()
-        cheque_amount = request.form.get('cheque_amount', type=float)
-        cheque_date_str = request.form.get('cheque_date', '')
-        bank_name = request.form.get('bank_name', '').strip()
-        notes = request.form.get('notes', '').strip()
+        if not customer_id:
+            flash('Please select a customer.', 'danger')
+            return redirect(url_for('payments.new_payment'))
 
-        if not all([customer_id, cheque_number, cheque_amount, cheque_date_str]):
-            flash('All required fields must be filled.', 'danger')
-        else:
+        amounts = request.form.getlist('cheque_amount[]')
+        cheque_numbers = request.form.getlist('cheque_number[]')
+        cheque_dates = request.form.getlist('cheque_date[]')
+        bank_names = request.form.getlist('bank_name[]')
+
+        # Fallback for single scalar submission
+        if not amounts and request.form.get('cheque_amount'):
+            amounts = [request.form.get('cheque_amount')]
+            cheque_numbers = [request.form.get('cheque_number', '')]
+            cheque_dates = [request.form.get('cheque_date', '')]
+            bank_names = [request.form.get('bank_name', '')]
+
+        notes = request.form.get('notes', '').strip()
+        now = today_ist()
+
+        collected_count = 0
+        total_collected = 0.0
+
+        for i in range(len(amounts)):
+            amt_str = amounts[i].strip() if i < len(amounts) else ''
+            if not amt_str:
+                continue
             try:
-                if '/' in cheque_date_str:
-                    parts = cheque_date_str.split('/')
-                    cheque_date = date(int(parts[2]), int(parts[1]), int(parts[0]))
-                else:
-                    cheque_date = datetime.strptime(cheque_date_str, '%Y-%m-%d').date()
-            except Exception:
-                cheque_date = today_ist()
+                amt = float(amt_str)
+            except (ValueError, TypeError):
+                continue
+            if amt <= 0:
+                continue
+
+            chq_num = cheque_numbers[i].strip() if i < len(cheque_numbers) and cheque_numbers[i] else f'COL-{now.strftime("%Y%m%d")}-{i+1}'
+            bank = bank_names[i].strip() if i < len(bank_names) and bank_names[i] else ''
+
+            c_date = now
+            if i < len(cheque_dates) and cheque_dates[i]:
+                try:
+                    raw_date = cheque_dates[i].strip()
+                    if '/' in raw_date:
+                        parts = raw_date.split('/')
+                        c_date = date(int(parts[2]), int(parts[1]), int(parts[0]))
+                    else:
+                        c_date = datetime.strptime(raw_date, '%Y-%m-%d').date()
+                except Exception:
+                    c_date = now
 
             payment = Payment(
                 rep_id=current_user.id,
                 customer_id=customer_id,
-                collection_date=today_ist(),
-                cheque_number=cheque_number,
-                cheque_amount=cheque_amount,
-                cheque_date=cheque_date,
-                bank_name=bank_name,
+                collection_date=now,
+                cheque_number=chq_num,
+                cheque_amount=amt,
+                cheque_date=c_date,
+                bank_name=bank,
                 notes=notes
             )
             db.session.add(payment)
+            collected_count += 1
+            total_collected += amt
+
+        if collected_count == 0:
+            flash('Please enter at least one valid cheque with an amount greater than zero.', 'danger')
+        else:
             db.session.commit()
-            flash(f'Payment collection of ₹{cheque_amount:,.2f} recorded!', 'success')
+            cheque_word = 'Cheque' if collected_count == 1 else 'Cheques'
+            flash(f'{collected_count} {cheque_word} recorded (Total ₹{total_collected:,.2f})!', 'success')
             return redirect(url_for('payments.list_payments'))
 
     customers = Customer.query.filter_by(is_active=True).order_by(Customer.name).all()

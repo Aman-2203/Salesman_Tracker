@@ -138,23 +138,27 @@
           </label>
         </div>
 
-        <!-- Collapsible Payment Details -->
+        <!-- Collapsible Payment Details (Multi-Cheque Collection) -->
         <div id="payment-details-box" style="display:none; margin-top:0.85rem; padding:1rem; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm);">
-          <div class="form-row cols-2 mb-1">
-            <div class="form-group" style="margin-bottom:0.5rem;">
-              <label for="payment_amount">Collection Amount (₹) <span class="required">*</span></label>
-              <input type="number" id="payment_amount" name="payment_amount" placeholder="0.00" min="0" step="0.01">
-            </div>
-            <div class="form-group" style="margin-bottom:0.5rem;">
-              <label for="cheque_number">Cheque / Ref #</label>
-              <input type="text" id="cheque_number" name="cheque_number" placeholder="e.g. 001245 or CASH">
-            </div>
+          <div class="d-flex align-center justify-between mb-2">
+            <span style="font-size:0.85rem; font-weight:700; color:var(--text-primary);"><i class="bi bi-credit-card-2-front"></i> Cheques Collected</span>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-add-cheque" onclick="addChequeRow()" style="font-size:0.8rem; padding:0.25rem 0.65rem;">
+              <i class="bi bi-plus-circle-fill text-success"></i> Add Another Cheque
+            </button>
           </div>
-          <div class="form-group" style="margin-bottom:0.3rem;">
-            <label for="bank_name">Bank Name</label>
-            <input type="text" id="bank_name" name="bank_name" placeholder="e.g. HDFC Bank, SBI">
+
+          <!-- Dynamic Container for Multiple Cheques -->
+          <div id="cheques-container"></div>
+
+          <!-- Live Cheques Sum & Count Indicator -->
+          <div id="cheque-total-banner" class="cheque-total-banner">
+            <span><i class="bi bi-cash-stack"></i> Total Collection:</span>
+            <span id="cheque-total-display">₹0.00 (0 Cheques)</span>
           </div>
-          <div class="fs-xs text-muted">A payment collection entry will be recorded automatically for this customer.</div>
+
+          <div class="fs-xs text-muted mt-2">
+            Each cheque will be saved with its Cheque #, Amount, Cheque Date, and Bank Name.
+          </div>
         </div>
       </div>
 
@@ -282,17 +286,125 @@ function toggleOrderSection(show) {
   }
 }
 
+// Multi-Cheque Management
+const defaultChequeDate = "{{ today.strftime('%Y-%m-%d') }}";
+
+function createChequeItemHtml(index) {
+  return `
+    <div class="cheque-card-item" data-cheque-index="${index}">
+      <div class="cheque-card-header">
+        <div class="cheque-card-title">
+          <i class="bi bi-receipt text-primary"></i> <span class="cheque-title-label">Cheque #${index + 1}</span>
+        </div>
+        <button type="button" class="btn-remove-cheque" onclick="removeChequeRow(this)" title="Remove cheque">
+          <i class="bi bi-x-circle"></i> Remove
+        </button>
+      </div>
+      <div class="form-row cols-2 mb-1">
+        <div class="form-group" style="margin-bottom:0.45rem;">
+          <label>Cheque Amount (₹) <span class="required">*</span></label>
+          <input type="number" name="cheque_amount[]" class="cheque-amount-input" placeholder="0.00" min="0.01" step="0.01" required oninput="updateChequeTotals()">
+        </div>
+        <div class="form-group" style="margin-bottom:0.45rem;">
+          <label>Cheque / Ref # <span class="required">*</span></label>
+          <input type="text" name="cheque_number[]" class="cheque-number-input" placeholder="e.g. 001245" required>
+        </div>
+      </div>
+      <div class="form-row cols-2 mb-1">
+        <div class="form-group" style="margin-bottom:0.3rem;">
+          <label>Cheque Date <span class="required">*</span></label>
+          <input type="date" name="cheque_date[]" class="cheque-date-input" value="${defaultChequeDate}" required>
+        </div>
+        <div class="form-group" style="margin-bottom:0.3rem;">
+          <label>Bank Name</label>
+          <input type="text" name="bank_name[]" class="cheque-bank-input" placeholder="e.g. HDFC Bank, SBI, ICICI">
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function addChequeRow() {
+  const container = document.getElementById('cheques-container');
+  const count = container.querySelectorAll('.cheque-card-item').length;
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = createChequeItemHtml(count);
+  const newRow = tempDiv.firstElementChild;
+  container.appendChild(newRow);
+  reindexCheques();
+  updateChequeTotals();
+
+  // Focus amount input of newly added cheque
+  const amtInput = newRow.querySelector('.cheque-amount-input');
+  if (amtInput) amtInput.focus();
+}
+
+function removeChequeRow(btn) {
+  const card = btn.closest('.cheque-card-item');
+  if (card) {
+    card.remove();
+    reindexCheques();
+    updateChequeTotals();
+  }
+}
+
+function reindexCheques() {
+  const container = document.getElementById('cheques-container');
+  const rows = container.querySelectorAll('.cheque-card-item');
+  rows.forEach((row, i) => {
+    row.setAttribute('data-cheque-index', i);
+    const label = row.querySelector('.cheque-title-label');
+    if (label) label.textContent = `Cheque #${i + 1}`;
+    
+    // Hide remove button if only 1 cheque exists
+    const removeBtn = row.querySelector('.btn-remove-cheque');
+    if (removeBtn) {
+      removeBtn.style.display = rows.length > 1 ? 'inline-flex' : 'none';
+    }
+  });
+}
+
+function updateChequeTotals() {
+  const container = document.getElementById('cheques-container');
+  const amountInputs = container.querySelectorAll('.cheque-amount-input');
+  let sum = 0;
+  let count = 0;
+  amountInputs.forEach(input => {
+    const val = parseFloat(input.value) || 0;
+    if (val > 0) {
+      sum += val;
+      count++;
+    }
+  });
+  const totalDisplay = document.getElementById('cheque-total-display');
+  if (totalDisplay) {
+    const chequeWord = count === 1 ? '1 Cheque' : `${count} Cheques`;
+    totalDisplay.textContent = `₹${sum.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${chequeWord})`;
+  }
+}
+
 // Toggle Payment Section
 function togglePaymentSection(show) {
   document.getElementById('toggle-payment-no').classList.toggle('selected', !show);
   document.getElementById('toggle-payment-yes').classList.toggle('selected', show);
   const box = document.getElementById('payment-details-box');
   box.style.display = show ? 'block' : 'none';
-  const amountInput = document.getElementById('payment_amount');
+  const container = document.getElementById('cheques-container');
+
   if (show) {
-    amountInput.focus();
+    if (container.children.length === 0) {
+      addChequeRow();
+    }
+    container.querySelectorAll('input').forEach(input => {
+      input.removeAttribute('disabled');
+    });
+    const firstInput = container.querySelector('.cheque-amount-input');
+    if (firstInput) firstInput.focus();
   } else {
-    amountInput.value = '';
+    // Disable inputs so required attributes don't block submit
+    container.querySelectorAll('input').forEach(input => {
+      input.setAttribute('disabled', 'disabled');
+    });
   }
 }
 
@@ -431,6 +543,46 @@ function togglePaymentSection(show) {
         e.preventDefault();
         alert('Please search and select a customer before submitting.');
         clearSelection();
+        return;
+      }
+
+      // Check payment validation if payment collected is checked
+      const paymentYesRadio = document.querySelector('input[name="payment_collected"][value="yes"]');
+      if (paymentYesRadio && paymentYesRadio.checked) {
+        const rows = document.querySelectorAll('#cheques-container .cheque-card-item');
+        if (rows.length === 0) {
+          e.preventDefault();
+          alert('Please add at least one cheque collection details or select "No Payment".');
+          return;
+        }
+
+        for (let i = 0; i < rows.length; i++) {
+          const amtInput = rows[i].querySelector('.cheque-amount-input');
+          const numInput = rows[i].querySelector('.cheque-number-input');
+          const dateInput = rows[i].querySelector('.cheque-date-input');
+
+          const amt = parseFloat(amtInput ? amtInput.value : 0);
+          if (!amt || amt <= 0) {
+            e.preventDefault();
+            alert(`Please enter a valid amount greater than zero for Cheque #${i + 1}.`);
+            if (amtInput) amtInput.focus();
+            return;
+          }
+
+          if (!numInput || !numInput.value.trim()) {
+            e.preventDefault();
+            alert(`Please enter the Cheque / Ref # for Cheque #${i + 1}.`);
+            if (numInput) numInput.focus();
+            return;
+          }
+
+          if (!dateInput || !dateInput.value.trim()) {
+            e.preventDefault();
+            alert(`Please select the Cheque Date for Cheque #${i + 1}.`);
+            if (dateInput) dateInput.focus();
+            return;
+          }
+        }
       }
     });
   }
